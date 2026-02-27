@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<libraryInfos>
+    <libraryInfo home="C:\pleiades\2025-12\java\11" version="11.0.29"/>
+    <libraryInfo home="C:\pleiades\2025-12\java\21" version="21.0.9"/>
+    <libraryInfo home="C:\pleiades\2025-12\java\8" version="1.8.0_472">
+        <bootpath>
+            <entry path="C:\pleiades\2025-12\java\8\jre\lib\resources.jar"/>
+            <entry path="C:\pleiades\2025-12\java\8\jre\lib\rt.jar"/>
+            <entry path="C:\pleiades\2025-12\java\8\jre\lib\sunrsasign.jar"/>
+            <entry path="C:\pleiades\2025-12\java\8\jre\lib\jsse.jar"/>
+            <entry path="C:\pleiades\2025-12\java\8\jre\lib\jce.jar"/>
+            <entry path="C:\pleiades\2025-12\java\8\jre\lib\charsets.jar"/>
+            <entry path="C:\pleiades\2025-12\java\8\jre\lib\jfr.jar"/>
+            <entry path="C:\pleiades\2025-12\java\8\jre\classes"/>
+        </bootpath>
+        <extensionDirs>
+            <entry path="C:\pleiades\2025-12\java\8\jre\lib\ext"/>
+            <entry path="C:\WINDOWS\Sun\Java\lib\ext"/>
+        </extensionDirs>
+        <endorsedDirs>
+            <entry path="C:\pleiades\2025-12\java\8\jre\lib\endorsed"/>
+        </endorsedDirs>
+    </libraryInfo>
+    <libraryInfo home="C:\Program Files\Java\jre1.8.0_102" version="1.8.0_102">
+        <bootpath>
+            <entry path="C:\Program Files\Java\jre1.8.0_102\lib\resources.jar"/>
+            <entry path="C:\Program Files\Java\jre1.8.0_102\lib\rt.jar"/>
+            <entry path="C:\Program Files\Java\jre1.8.0_102\lib\sunrsasign.jar"/>
+            <entry path="C:\Program Files\Java\jre1.8.0_102\lib\jsse.jar"/>
+            <entry path="C:\Program Files\Java\jre1.8.0_102\lib\jce.jar"/>
+            <entry path="C:\Program Files\Java\jre1.8.0_102\lib\charsets.jar"/>
+            <entry path="C:\Program Files\Java\jre1.8.0_102\lib\jfr.jar"/>
+            <entry path="C:\Program Files\Java\jre1.8.0_102\classes"/>
+        </bootpath>
+        <extensionDirs>
+            <entry path="C:\Program Files\Java\jre1.8.0_102\lib\ext"/>
+            <entry path="C:\WINDOWS\Sun\Java\lib\ext"/>
+        </extensionDirs>
+        <endorsedDirs>
+            <entry path="C:\Program Files\Java\jre1.8.0_102\lib\endorsed"/>
+        </endorsedDirs>
+    </libraryInfo>
+    <libraryInfo home="C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot" version="17.0.18"/>
+    <libraryInfo home="C:\pleiades\2025-12\java\25" version="25.0.1"/>
+    <libraryInfo home="C:\pleiades\2025-12\java\17" version="17.0.17"/>
+</libraryInfos>
