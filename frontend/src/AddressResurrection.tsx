@@ -1,4 +1,3 @@
-
 import { formatDateTime } from "./dateUtil";
 import React, { useEffect, useState } from "react";
 import { Box, Typography, IconButton, Button } from "@mui/material";
@@ -30,7 +29,9 @@ const AddressResurrection: React.FC = () => {
     const fetchDeletedAddresses = async () => {
         setLoading(true);
         try {
-            const resp = await fetch("http://localhost:8081/address/deleted");
+            const resp = await fetch("http://localhost:8081/address/deleted", {
+                credentials: "include"
+            });
             const addresses = await resp.json();
             setData(addresses);
         } catch (e) {
@@ -46,7 +47,9 @@ const AddressResurrection: React.FC = () => {
     // 役割（mstrole）一覧を取得
     const [mstroles, setMstroles] = useState<{ id: number; name: string; deletedAt?: string | null }[]>([]);
     useEffect(() => {
-        fetch("http://localhost:8081/api/mstrole")
+        fetch("http://localhost:8081/api/mstrole", {
+            credentials: "include"
+        })
             .then(res => res.json())
             .then(data => {
                 if (Array.isArray(data)) setMstroles(data);
@@ -56,6 +59,10 @@ const AddressResurrection: React.FC = () => {
         try {
             const resp = await fetch(`http://localhost:8081/address/restore/${id}`, {
                 method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                credentials: "include"
             });
             if (resp.ok) {
                 await fetchDeletedAddresses();
@@ -68,7 +75,7 @@ const AddressResurrection: React.FC = () => {
     };
 
     const columns: MRT_ColumnDef<Address>[] = [
-                {
+        {
             accessorKey: "actions",
             header: "操作",
             Cell: ({ row }: { row: any }) => (
@@ -83,13 +90,14 @@ const AddressResurrection: React.FC = () => {
         { accessorKey: "phoneNumber", header: "電話番号" },
         { accessorKey: "age", header: "年齢" },
         { accessorKey: "sex", header: "性別" },
-                { accessorKey: "role", header: "役職",
-                    Cell: ({ cell }) => {
-                        const roleId = cell.getValue<number>();
-                        const role = mstroles.find(r => r.id === roleId);
-                        return role ? role.name : roleId;
-                    }
-                },
+        {
+            accessorKey: "role", header: "役職",
+            Cell: ({ cell }) => {
+                const roleId = cell.getValue<number>();
+                const role = mstroles.find(r => r.id === roleId);
+                return role ? role.name : roleId;
+            }
+        },
         { accessorKey: "createdAt", header: "作成日時", Cell: ({ cell }) => formatDateTime(cell.getValue<string>()) },
         { accessorKey: "updatedAt", header: "更新日時", Cell: ({ cell }) => formatDateTime(cell.getValue<string>()) },
         { accessorKey: "deletedAt", header: "削除日時", Cell: ({ cell }) => formatDateTime(cell.getValue<string>()) },
@@ -104,8 +112,8 @@ const AddressResurrection: React.FC = () => {
                         住所復活画面
                     </Typography>
                     <Button variant="outlined" onClick={fetchDeletedAddresses} sx={{ ml: 2 }}
-                    
-                              startIcon={<RefreshIcon />}>
+
+                        startIcon={<RefreshIcon />}>
                         再読み込み
                     </Button>
                 </Box>

@@ -1,4 +1,3 @@
-
 import DownloadIcon from '@mui/icons-material/Download';
 import * as FileSaver from 'file-saver';
 import React, { useEffect, useState } from "react";
@@ -142,7 +141,9 @@ const Table: React.FC = () => {
   // ユーザー一覧を取得
   const fetchAddresses = async () => {
     try {
-      const response = await fetch("http://localhost:8081/address");
+      const response = await fetch("http://localhost:8081/address", {
+        credentials: "include"
+      });
       const userData = await response.json();
       setData(userData);
     } catch (err) {
@@ -157,11 +158,11 @@ const Table: React.FC = () => {
   // 役割（mstrole）一覧を取得
   const [mstroles, setMstroles] = useState<{ id: number; name: string; deletedAt?: string | null }[]>([]);
   useEffect(() => {
-    fetch("http://localhost:8081/api/mstrole")
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setMstroles(data);
-      });
+    fetch("http://localhost:8081/api/mstrole", {
+      credentials: "include"
+    })
+      .then((res) => res.json())
+      .then((data) => setMstroles(data));
   }, []);
 
   // ダイアログを閉じる
@@ -234,19 +235,19 @@ const Table: React.FC = () => {
     const errors: typeof formErrors = {};
     if (!formData.name || formData.name.trim() === "") {
       errors.name = "名前は必須です";
-      } else if (formData.name.length > 255) {
-        errors.name = "名前は255文字以内で入力してください";
+    } else if (formData.name.length > 255) {
+      errors.name = "名前は255文字以内で入力してください";
     }
     if (!formData.phoneNumber || formData.phoneNumber.trim() === "") {
       errors.phoneNumber = "電話番号は必須です";
-    // 電話番号が0から始まり、9～10桁の数字であるかチェック
+      // 電話番号が0から始まり、9～10桁の数字であるかチェック
     } else if (!/^0\d{9,10}$/.test(formData.phoneNumber)) {
       errors.phoneNumber = "正しい電話番号を入力してください";
     }
     if (!formData.address || formData.address.trim() === "") {
       errors.address = "住所は必須です";
-      } else if (formData.address.length > 255) {
-        errors.address = "住所は255文字以内で入力してください";
+    } else if (formData.address.length > 255) {
+      errors.address = "住所は255文字以内で入力してください";
     }
     // 年齢のバリデーション（number型のみ）
     if (formData.age === undefined || formData.age === null || isNaN(formData.age)) {
@@ -286,7 +287,6 @@ const Table: React.FC = () => {
       return;
     }
     try {
-      const userId = localStorage.getItem('userId') || '';
       const url = isEditing
         ? `http://localhost:8081/address/${selectedAddress?.id}`
         : "http://localhost:8081/address";
@@ -296,10 +296,10 @@ const Table: React.FC = () => {
       const response = await fetch(url, {
         method,
         headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": userId,
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(formData),
+        credentials: "include"
       });
 
       if (!response.ok) {
@@ -336,14 +336,12 @@ const Table: React.FC = () => {
     // }
 
     try {
-      const userId = localStorage.getItem('userId') || '';
       const response = await fetch(`http://localhost:8081/address/delete/${addressId}`, {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": userId,
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify(formData),
+        credentials: "include"
       });
 
       if (!response.ok) {
@@ -406,14 +404,16 @@ const Table: React.FC = () => {
         </Box>
       ),
     },
-    { accessorKey: "id", header: "ID" , size: 50},
+    { accessorKey: "id", header: "ID", size: 50 },
     { accessorKey: "name", header: "名前" },
     { accessorKey: "address", header: "住所" },
     { accessorKey: "phoneNumber", header: "電話番号" },
-    { accessorKey: "age", header: "年齢", Cell: ({ cell }) => {
-      const age = cell.getValue<number>();
-      return <span style={{ display: 'block', textAlign: 'center' }}>{age}歳</span>;
-    } },
+    {
+      accessorKey: "age", header: "年齢", Cell: ({ cell }) => {
+        const age = cell.getValue<number>();
+        return <span style={{ display: 'block', textAlign: 'center' }}>{age}歳</span>;
+      }
+    },
     {
       accessorKey: "sex",
       header: "性別",
@@ -520,75 +520,75 @@ const Table: React.FC = () => {
               }
             }}
           >
-          <TextField
-            autoFocus
-            label="名前"
-            value={formData.name}
-            onChange={(e) => handleFormChange("name", e.target.value)}
-            fullWidth
-            margin="normal"
-            error={!!formErrors.name}
-            helperText={formErrors.name}
-          />
-          <TextField
-            label="郵便番号（7桁）"
-            value={postalCode}
-            onChange={(e) => handlePostalCodeChange(e.target.value.replace(/[^0-9]/g, ""))}
-            fullWidth
-            margin="normal"
-            inputProps={{ maxLength: 7 }}
-            helperText={postalError ? postalError : "入力で自動住所取得"}
-            error={!!postalError}
-            disabled={postalLoading}
-          />
-          <TextField
-            label="住所名"
-            value={formData.address}
-            onChange={(e) => handleFormChange("address", e.target.value)}
-            fullWidth
-            margin="normal"
-            error={!!formErrors.address}
-            helperText={formErrors.address}
-          />
-          <TextField
-            label="電話番号"
-            value={formData.phoneNumber}
-            onChange={(e) => handleFormChange("phoneNumber", e.target.value)}
-            fullWidth
-            margin="normal"
-            error={!!formErrors.phoneNumber}
-            helperText={formErrors.phoneNumber}
-          />
-          <TextField
-            label="年齢"
-            type="number"
-            value={formData.age}
-            onChange={(e) => {
-              const val = e.target.value;
-              handleFormChange("age", val === "" ? "" : Number(val));
-            }}
-            fullWidth
-            margin="normal"
-            error={!!formErrors.age}
-            helperText={formErrors.age}
-            inputProps={{ min: 0, max: 120 }}
-          />
-          <FormControl fullWidth margin="normal" error={!!formErrors.sex}>
-            <InputLabel>性別</InputLabel>
-            <Select
-              value={formData.sex ?? ""}
-              label="性別"
-              onChange={(e) => handleFormChange("sex", e.target.value)}
-              displayEmpty
-            >
-              <MenuItem value="male">男性</MenuItem>
-              <MenuItem value="female">女性</MenuItem>
-              <MenuItem value="other">その他</MenuItem>
-            </Select>
-            {formErrors.sex && (
-              <Box sx={{ color: 'error.main', fontSize: 12, mt: 0.5 }}>{formErrors.sex}</Box>
-            )}
-          </FormControl>
+            <TextField
+              autoFocus
+              label="名前"
+              value={formData.name}
+              onChange={(e) => handleFormChange("name", e.target.value)}
+              fullWidth
+              margin="normal"
+              error={!!formErrors.name}
+              helperText={formErrors.name}
+            />
+            <TextField
+              label="郵便番号（7桁）"
+              value={postalCode}
+              onChange={(e) => handlePostalCodeChange(e.target.value.replace(/[^0-9]/g, ""))}
+              fullWidth
+              margin="normal"
+              inputProps={{ maxLength: 7 }}
+              helperText={postalError ? postalError : "入力で自動住所取得"}
+              error={!!postalError}
+              disabled={postalLoading}
+            />
+            <TextField
+              label="住所名"
+              value={formData.address}
+              onChange={(e) => handleFormChange("address", e.target.value)}
+              fullWidth
+              margin="normal"
+              error={!!formErrors.address}
+              helperText={formErrors.address}
+            />
+            <TextField
+              label="電話番号"
+              value={formData.phoneNumber}
+              onChange={(e) => handleFormChange("phoneNumber", e.target.value)}
+              fullWidth
+              margin="normal"
+              error={!!formErrors.phoneNumber}
+              helperText={formErrors.phoneNumber}
+            />
+            <TextField
+              label="年齢"
+              type="number"
+              value={formData.age}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleFormChange("age", val === "" ? "" : Number(val));
+              }}
+              fullWidth
+              margin="normal"
+              error={!!formErrors.age}
+              helperText={formErrors.age}
+              inputProps={{ min: 0, max: 120 }}
+            />
+            <FormControl fullWidth margin="normal" error={!!formErrors.sex}>
+              <InputLabel>性別</InputLabel>
+              <Select
+                value={formData.sex ?? ""}
+                label="性別"
+                onChange={(e) => handleFormChange("sex", e.target.value)}
+                displayEmpty
+              >
+                <MenuItem value="male">男性</MenuItem>
+                <MenuItem value="female">女性</MenuItem>
+                <MenuItem value="other">その他</MenuItem>
+              </Select>
+              {formErrors.sex && (
+                <Box sx={{ color: 'error.main', fontSize: 12, mt: 0.5 }}>{formErrors.sex}</Box>
+              )}
+            </FormControl>
           </form>
 
           <FormControl fullWidth margin="normal" error={!!formErrors.category}>

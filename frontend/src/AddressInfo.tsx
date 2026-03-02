@@ -33,7 +33,9 @@ const AddressInfo: React.FC = () => {
 	// 役割（mstrole）一覧を取得
 	const [mstroles, setMstroles] = React.useState<{ id: number; name: string; deletedAt?: string | null }[]>([]);
 	React.useEffect(() => {
-		fetch("http://localhost:8081/api/mstrole")
+		fetch("http://localhost:8081/api/mstrole", {
+			credentials: "include"
+		})
 			.then(res => res.json())
 			.then(data => {
 				if (Array.isArray(data)) setMstroles(data);
@@ -42,7 +44,9 @@ const AddressInfo: React.FC = () => {
 	// カテゴリ（mstcategory）一覧を取得
 	const [mstcategories, setMstcategories] = React.useState<{ id: number; name: string; deletedAt?: string | null }[]>([]);
 	React.useEffect(() => {
-		fetch("http://localhost:8081/api/mstcategory")
+		fetch("http://localhost:8081/api/mstcategory", {
+			credentials: "include"
+		})
 			.then(res => res.json())
 			.then(data => {
 				if (Array.isArray(data)) setMstcategories(data);
@@ -64,7 +68,10 @@ const AddressInfo: React.FC = () => {
 			try {
 				// Nominatim(OpenStreetMap)の無料ジオコーディングAPIを利用
 				const res = await fetch(
-					`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address.address)}`
+					`http://localhost:8081/address/${address.id}`,
+					{
+						credentials: "include"
+					}
 				);
 				const data = await res.json();
 				if (data && data.length > 0) {

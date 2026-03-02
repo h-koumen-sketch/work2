@@ -27,9 +27,6 @@ import java.time.LocalDateTime;
  * <li>ユーザー情報の取得・登録・更新・論理削除・復活</li>
  * <li>パスワード変更（メールアドレス指定）</li>
  * </ul>
- * <p>
- * 各APIは、リクエストヘッダーのX-User-Idによる操作ユーザー識別や、SystemlogServiceによる操作履歴記録を行います。
- * <p>
  * セキュリティ面では、パスワードはBCryptでハッシュ化して保存し、ログインやパスワード変更時にハッシュ照合を行います。
  * <p>
  * 利用例：
@@ -46,7 +43,7 @@ import java.time.LocalDateTime;
  * エラー時は適切なHTTPステータスとメッセージを返却します。
  */
 @RestController
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class UserController {
     @Autowired
     private SystemlogService logService;
@@ -86,7 +83,7 @@ public class UserController {
     }
 
     /**
-     * ユーザー認証（ログイン）API。
+     * ユーザー認証（ログイン）API.
      * <p>
      * emailとpasswordを受け取り、認証成功時はユーザー情報とロールを返却。
      * 失敗時はエラー内容を返す。
@@ -96,8 +93,7 @@ public class UserController {
      * @return 認証結果（status, role, id, email等）
      */
     @PostMapping("/auth/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest req,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest req, jakarta.servlet.http.HttpSession session) {
         String logUserId = "-";
         if (req == null || req.getEmail() == null || req.getPassword() == null) {
             logService.writeLog(logUserId, "login", "User", "-", "error:bad_request");
@@ -147,6 +143,10 @@ public class UserController {
             resp.put("role", user.getRole());
             resp.put("id", user.getId()); // ユーザーIDを追加
             resp.put("email", user.getEmail());
+            // セッションにユーザー情報を保存
+            session.setAttribute("userId", user.getId());
+            session.setAttribute("userEmail", user.getEmail());
+            session.setAttribute("userRole", user.getRole());
             logService.writeLog(logUserId, "login", "User", logUserId, "success");
             return ResponseEntity.ok(resp);
         } else {
@@ -160,7 +160,7 @@ public class UserController {
     }
 
     /**
-     * 全ユーザー情報取得API。
+     * 全ユーザー情報取得API.
      * <p>
      * ユーザー一覧を返却。
      * 
@@ -172,7 +172,7 @@ public class UserController {
     }
 
     /**
-     * ユーザーID指定取得API。
+     * ユーザーID指定取得API.
      * <p>
      * 指定IDのユーザー情報を返却。
      * 
@@ -187,7 +187,7 @@ public class UserController {
     }
 
     /**
-     * ユーザー新規登録API。
+     * ユーザー新規登録API.
      * <p>
      * ユーザー情報を受け取り新規作成。
      * 
@@ -196,21 +196,29 @@ public class UserController {
      * @return 作成されたユーザー情報
      */
     @PostMapping("/users")
-    public ResponseEntity<User> create(@RequestBody User user,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    public ResponseEntity<User> create(@RequestBody User user) {
         if (user.getPasswordHash() != null && !user.getPasswordHash().isEmpty()) {
             user.setPasswordHash(passwordEncoder.encode(user.getPasswordHash()));
         }
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
         User savedUser = repository.save(user);
-        logService.writeLog(userId != null ? userId : "system", "create", "User", String.valueOf(savedUser.getId()),
+        // セッションからuserId取得
+        String sessionUserId = null;
+        jakarta.servlet.http.HttpSession session = null;
+        try {
+            session = ((org.springframework.web.context.request.ServletRequestAttributes) org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()).getRequest().getSession(false);
+        } catch (Exception e) {}
+        if (session != null && session.getAttribute("userId") != null) {
+            sessionUserId = String.valueOf(session.getAttribute("userId"));
+        }
+        logService.writeLog(sessionUserId != null ? sessionUserId : "system", "create", "User", String.valueOf(savedUser.getId()),
                 "success");
         return ResponseEntity.status(HttpStatus.CREATED).body(savedUser);
     }
 
     /**
-     * ユーザー情報更新API。
+     * ユーザー情報更新API.
      * <p>
      * 指定IDのユーザー情報を更新。
      * 
@@ -220,8 +228,7 @@ public class UserController {
      * @return 更新後のユーザー情報
      */
     @PutMapping("/users/{id}")
-    public ResponseEntity<User> update(@PathVariable Long id, @RequestBody User userDetails,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    public ResponseEntity<User> update(@PathVariable Long id, @RequestBody User userDetails) {
         Optional<User> optionalUser = repository.findById(id);
         if (optionalUser.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -238,14 +245,23 @@ public class UserController {
         }
         user.setUpdatedAt(LocalDateTime.now());
         User updatedUser = repository.save(user);
-        logService.writeLog(userId != null ? userId : "system", "update", "User", String.valueOf(updatedUser.getId()),
+        // セッションからuserId取得
+        String sessionUserId = null;
+        jakarta.servlet.http.HttpSession session = null;
+        try {
+            session = ((org.springframework.web.context.request.ServletRequestAttributes) org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()).getRequest().getSession(false);
+        } catch (Exception e) {}
+        if (session != null && session.getAttribute("userId") != null) {
+            sessionUserId = String.valueOf(session.getAttribute("userId"));
+        }
+        logService.writeLog(sessionUserId != null ? sessionUserId : "system", "update", "User", String.valueOf(updatedUser.getId()),
                 "success");
         return ResponseEntity.ok(updatedUser);
     }
 
     // ユーザー復活API
     /**
-     * ユーザー復活API。
+     * ユーザー復活API.
      * <p>
      * 論理削除されたユーザーを復活。
      * 
@@ -254,8 +270,7 @@ public class UserController {
      * @return 復活後のユーザー情報
      */
     @PutMapping("/users/restore/{id}")
-    public ResponseEntity<User> restore(@PathVariable Long id,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    public ResponseEntity<User> restore(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
         Optional<User> optionalUser = repository.findById(id);
         if (optionalUser.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -264,13 +279,13 @@ public class UserController {
         user.setDeletedAt(null);
         user.setUpdatedAt(LocalDateTime.now());
         User updatedUser = repository.save(user);
-        logService.writeLog(userId != null ? userId : "system", "restore", "User", String.valueOf(updatedUser.getId()),
-                "success");
+        String sessionUserId = (session != null && session.getAttribute("userId") != null) ? String.valueOf(session.getAttribute("userId")) : "system";
+        logService.writeLog(sessionUserId, "restore", "User", String.valueOf(updatedUser.getId()), "success");
         return ResponseEntity.ok(updatedUser);
     }
 
     /**
-     * ユーザー論理削除API。
+     * ユーザー論理削除API.
      * <p>
      * 指定IDのユーザーを論理削除（deletedAt設定）。
      * 
@@ -280,8 +295,7 @@ public class UserController {
      * @return 削除後のユーザー情報
      */
     @PutMapping("/users/delete/{id}")
-    public ResponseEntity<User> softDelete(@PathVariable Long id, @RequestBody User userDetails,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    public ResponseEntity<User> softDelete(@PathVariable Long id, @RequestBody User userDetails, jakarta.servlet.http.HttpSession session) {
         Optional<User> optionalUser = repository.findById(id);
         if (optionalUser.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -290,13 +304,13 @@ public class UserController {
         user.setUpdatedAt(LocalDateTime.now());
         user.setDeletedAt(LocalDateTime.now());
         User updatedUser = repository.save(user);
-        logService.writeLog(userId != null ? userId : "system", "softDelete", "User",
-                String.valueOf(updatedUser.getId()), "success");
+        String sessionUserId = (session != null && session.getAttribute("userId") != null) ? String.valueOf(session.getAttribute("userId")) : "system";
+        logService.writeLog(sessionUserId, "softDelete", "User", String.valueOf(updatedUser.getId()), "success");
         return ResponseEntity.ok(updatedUser);
     }
 
     /**
-     * ユーザー完全削除API。
+     * ユーザー完全削除API.
      * <p>
      * 指定IDのユーザーをDBから完全削除。
      * 
@@ -305,14 +319,22 @@ public class UserController {
      * @return 204 No Content
      */
     @DeleteMapping("/users/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         Optional<User> user = repository.findById(id);
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
         repository.deleteById(id);
-        logService.writeLog(userId != null ? userId : "system", "delete", "User", String.valueOf(id), "success");
+        // セッションからuserId取得
+        String sessionUserId = null;
+        jakarta.servlet.http.HttpSession session = null;
+        try {
+            session = ((org.springframework.web.context.request.ServletRequestAttributes) org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()).getRequest().getSession(false);
+        } catch (Exception e) {}
+        if (session != null && session.getAttribute("userId") != null) {
+            sessionUserId = String.valueOf(session.getAttribute("userId"));
+        }
+        logService.writeLog(sessionUserId != null ? sessionUserId : "system", "delete", "User", String.valueOf(id), "success");
         return ResponseEntity.noContent().build();
     }
 
@@ -355,49 +377,37 @@ public class UserController {
      * @return 変更結果（OK or エラー）
      */
     @PutMapping("/users/email/{email}/password")
-    public ResponseEntity<?> changePasswordByEmail(@PathVariable String email, @RequestBody ChangePasswordRequest req,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    public ResponseEntity<?> changePasswordByEmail(@PathVariable String email, @RequestBody ChangePasswordRequest req, jakarta.servlet.http.HttpSession session) {
         Optional<User> optionalUser = repository.findByEmail(email);
+        String sessionUserId = (session != null && session.getAttribute("userId") != null) ? String.valueOf(session.getAttribute("userId")) : "system";
         if (optionalUser.isEmpty()) {
-            logService.writeLog(userId != null ? userId : "system", "changePassword", "User", "-",
-                    "error:user_not_found");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new HashMap<String, Object>() {
-                {
-                    put("status", "error");
-                    put("message", "ユーザーが見つかりません");
-                }
-            });
+            logService.writeLog(sessionUserId, "changePassword", "User", "-", "error:user_not_found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new HashMap<String, Object>() {{
+                put("status", "error");
+                put("message", "ユーザーが見つかりません");
+            }});
         }
         User user = optionalUser.get();
         if (req.getCurrentPassword() == null || req.getNewPassword() == null) {
-            logService.writeLog(userId != null ? userId : "system", "changePassword", "User",
-                    String.valueOf(user.getId()), "error:bad_request");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new HashMap<String, Object>() {
-                {
-                    put("status", "error");
-                    put("message", "パラメータ不正");
-                }
-            });
+            logService.writeLog(sessionUserId, "changePassword", "User", String.valueOf(user.getId()), "error:bad_request");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new HashMap<String, Object>() {{
+                put("status", "error");
+                put("message", "パラメータ不正");
+            }});
         }
         if (!passwordEncoder.matches(req.getCurrentPassword(), user.getPasswordHash())) {
-            logService.writeLog(userId != null ? userId : "system", "changePassword", "User",
-                    String.valueOf(user.getId()), "error:wrong_password");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new HashMap<String, Object>() {
-                {
-                    put("status", "error");
-                    put("message", "現在のパスワードが違います");
-                }
-            });
+            logService.writeLog(sessionUserId, "changePassword", "User", String.valueOf(user.getId()), "error:wrong_password");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new HashMap<String, Object>() {{
+                put("status", "error");
+                put("message", "現在のパスワードが違います");
+            }});
         }
         user.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
         user.setUpdatedAt(LocalDateTime.now());
         repository.save(user);
-        logService.writeLog(userId != null ? userId : "system", "changePassword", "User", String.valueOf(user.getId()),
-                "success");
-        return ResponseEntity.ok(new HashMap<String, Object>() {
-            {
-                put("status", "OK");
-            }
-        });
+        logService.writeLog(sessionUserId, "changePassword", "User", String.valueOf(user.getId()), "success");
+        return ResponseEntity.ok(new HashMap<String, Object>() {{
+            put("status", "OK");
+        }});
     }
 }
