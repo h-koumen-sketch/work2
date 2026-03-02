@@ -66,12 +66,10 @@ const AddressInfo: React.FC = () => {
 			setLoading(true);
 			setError(null);
 			try {
-				// Nominatim(OpenStreetMap)の無料ジオコーディングAPIを利用
+				// OpenStreetMap Nominatim APIで住所から座標取得
+				const query = encodeURIComponent(address.address);
 				const res = await fetch(
-					`http://localhost:8081/address/${address.id}`,
-					{
-						credentials: "include"
-					}
+					`https://nominatim.openstreetmap.org/search?format=json&q=${query}`
 				);
 				const data = await res.json();
 				if (data && data.length > 0) {
@@ -166,10 +164,8 @@ const AddressInfo: React.FC = () => {
 									<TableCell>作成日時</TableCell>
 									<TableCell>{formatDateTime(address.createdAt)}</TableCell>
 								</TableRow>
-								<TableRow>
 									<TableCell>更新日時</TableCell>
 									<TableCell>{formatDateTime(address.updatedAt)}</TableCell>
-								</TableRow>
 							</TableBody>
 						</Table>
 						<Box display="flex" justifyContent="flex-end" mt={2}>

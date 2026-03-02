@@ -113,6 +113,7 @@ public class AddressController {
     @GetMapping("/address/{id}")
     public ResponseEntity<Address> getById(@PathVariable Long id) {
         Optional<Address> address = repository.findById(id);
+        System.out.println("getById called with id: " + id);
         return address.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
