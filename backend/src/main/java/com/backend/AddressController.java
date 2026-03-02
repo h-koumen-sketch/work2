@@ -24,7 +24,7 @@ import java.util.Optional;
  * Addressエンティティの操作APIを提供します。
  */
 @RestController
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class AddressController {
 
     @Autowired
@@ -52,10 +52,6 @@ public class AddressController {
      * @param id 復活させる住所のID
      * @return 復活後の住所情報
      */
-    @PutMapping("/address/restore/{id}")
-    public ResponseEntity<Address> restore(@PathVariable Long id) {
-        return restore(id, "system");
-    }
 
     /**
      * 住所復活API（ユーザーID付き）。
@@ -66,21 +62,21 @@ public class AddressController {
      * @param userId 操作ユーザーID（任意）
      * @return 復活後の住所情報
      */
-    @PutMapping(value = "/address/restore/{id}", headers = "X-User-Id")
-    public ResponseEntity<Address> restore(@PathVariable Long id,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    @PutMapping(value = "/address/restore/{id}")
+    public ResponseEntity<Address> restore(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
+        String sessionUserId = session != null && session.getAttribute("userId") != null
+            ? String.valueOf(session.getAttribute("userId"))
+            : "system";
         Optional<Address> optionalAddress = repository.findById(id);
         if (optionalAddress.isEmpty()) {
-            logService.writeLog(userId != null ? userId : "system", "restore", "Address", String.valueOf(id),
-                    "error:not_found");
+            logService.writeLog(sessionUserId, "restore", "Address", String.valueOf(id), "error:not_found");
             return ResponseEntity.notFound().build();
         }
         Address address = optionalAddress.get();
         address.setDeletedAt(null);
         address.setUpdatedAt(LocalDateTime.now());
         Address updatedAddress = repository.save(address);
-        logService.writeLog(userId != null ? userId : "system", "restore", "Address",
-                String.valueOf(updatedAddress.getId()), "success");
+        logService.writeLog(sessionUserId, "restore", "Address", String.valueOf(updatedAddress.getId()), "success");
         return ResponseEntity.ok(updatedAddress);
     }
 
@@ -121,19 +117,6 @@ public class AddressController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /**
-     * 住所新規登録API。
-     * <p>
-     * 住所情報を受け取り新規作成。操作ユーザーIDをログに記録。
-     * 
-     * @param address 住所情報
-     * @param userId  操作ユーザーID（任意）
-     * @return 作成された住所情報
-     */
-    @PostMapping("/address")
-    public ResponseEntity<Address> create(@RequestBody Address address) {
-        return create(address, "system");
-    }
 
     /**
      * 住所新規登録API（ユーザーID付き）。
@@ -144,30 +127,16 @@ public class AddressController {
      * @param userId  操作ユーザーID（任意）
      * @return 作成された住所情報
      */
-    @PostMapping(value = "/address", headers = "X-User-Id")
-    public ResponseEntity<Address> create(@RequestBody Address address,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    @PostMapping(value = "/address")
+    public ResponseEntity<Address> create(@RequestBody Address address, jakarta.servlet.http.HttpSession session) {
+        String sessionUserId = session != null && session.getAttribute("userId") != null
+            ? String.valueOf(session.getAttribute("userId"))
+            : "system";
         address.setCreatedAt(LocalDateTime.now());
         address.setUpdatedAt(LocalDateTime.now());
         Address savedAddress = repository.save(address);
-        logService.writeLog(userId != null ? userId : "system", "create", "Address",
-                String.valueOf(savedAddress.getId()), "success");
+        logService.writeLog(sessionUserId, "create", "Address", String.valueOf(savedAddress.getId()), "success");
         return ResponseEntity.status(HttpStatus.CREATED).body(savedAddress);
-    }
-
-    /**
-     * 住所更新API。
-     * <p>
-     * 指定IDの住所情報を受け取り更新。操作ユーザーIDをログに記録。
-     * 
-     * @param id      住所ID
-     * @param address 更新する住所情報
-     * @param userId  操作ユーザーID（任意）
-     * @return 更新された住所情報 or 404
-     */
-    @PutMapping("/address/{id}")
-    public ResponseEntity<Address> update(@PathVariable Long id, @RequestBody Address addressDetails) {
-        return update(id, addressDetails, "system");
     }
 
     /**
@@ -180,13 +149,14 @@ public class AddressController {
      * @param userId  操作ユーザーID（任意）
      * @return 更新された住所情報 or 404
      */
-    @PutMapping(value = "/address/{id}", headers = "X-User-Id")
-    public ResponseEntity<Address> update(@PathVariable Long id, @RequestBody Address addressDetails,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    @PutMapping(value = "/address/{id}")
+    public ResponseEntity<Address> update(@PathVariable Long id, @RequestBody Address addressDetails, jakarta.servlet.http.HttpSession session) {
+        String sessionUserId = session != null && session.getAttribute("userId") != null
+            ? String.valueOf(session.getAttribute("userId"))
+            : "system";
         Optional<Address> optionalAddress = repository.findById(id);
         if (optionalAddress.isEmpty()) {
-            logService.writeLog(userId != null ? userId : "system", "update", "Address", String.valueOf(id),
-                    "error:not_found");
+            logService.writeLog(sessionUserId, "update", "Address", String.valueOf(id), "error:not_found");
             return ResponseEntity.notFound().build();
         }
         Address address = optionalAddress.get();
@@ -213,24 +183,10 @@ public class AddressController {
         }
         address.setUpdatedAt(LocalDateTime.now());
         Address updatedAddress = repository.save(address);
-        logService.writeLog(userId != null ? userId : "system", "update", "Address",
-                String.valueOf(updatedAddress.getId()), "success");
+        logService.writeLog(sessionUserId, "update", "Address", String.valueOf(updatedAddress.getId()), "success");
         return ResponseEntity.ok(updatedAddress);
     }
 
-    /**
-     * 住所論理削除API。
-     * <p>
-     * 指定IDの住所を論理削除。操作ユーザーIDをログに記録。
-     * 
-     * @param id     住所ID
-     * @param userId 操作ユーザーID（任意）
-     * @return 論理削除された住所情報 or 404
-     */
-    @PutMapping("/address/delete/{id}")
-    public ResponseEntity<Address> softDelete(@PathVariable Long id) {
-        return softDelete(id, "system");
-    }
 
     /**
      * 住所論理削除API（ユーザーID付き）。
@@ -241,21 +197,21 @@ public class AddressController {
      * @param userId 操作ユーザーID（任意）
      * @return 論理削除された住所情報 or 404
      */
-    @PutMapping(value = "/address/delete/{id}", headers = "X-User-Id")
-    public ResponseEntity<Address> softDelete(@PathVariable Long id,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+    @PutMapping(value = "/address/delete/{id}")
+    public ResponseEntity<Address> softDelete(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
+        String sessionUserId = session != null && session.getAttribute("userId") != null
+            ? String.valueOf(session.getAttribute("userId"))
+            : "system";
         Optional<Address> optionalAddress = repository.findById(id);
         if (optionalAddress.isEmpty()) {
-            logService.writeLog(userId != null ? userId : "system", "softDelete", "Address", String.valueOf(id),
-                    "error:not_found");
+            logService.writeLog(sessionUserId, "softDelete", "Address", String.valueOf(id), "error:not_found");
             return ResponseEntity.notFound().build();
         }
         Address address = optionalAddress.get();
         address.setUpdatedAt(LocalDateTime.now());
         address.setDeletedAt(LocalDateTime.now());
         Address updatedAddress = repository.save(address);
-        logService.writeLog(userId != null ? userId : "system", "softDelete", "Address",
-                String.valueOf(updatedAddress.getId()), "success");
+        logService.writeLog(sessionUserId, "softDelete", "Address", String.valueOf(updatedAddress.getId()), "success");
         return ResponseEntity.ok(updatedAddress);
     }
 
@@ -269,14 +225,17 @@ public class AddressController {
      * @return 204 No Content or 404
      */
     @DeleteMapping("/address/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
+        String sessionUserId = session != null && session.getAttribute("userId") != null
+            ? String.valueOf(session.getAttribute("userId"))
+            : "system";
         Optional<Address> address = repository.findById(id);
         if (address.isEmpty()) {
-            logService.writeLog("system", "delete", "Address", String.valueOf(id), "error:not_found");
+            logService.writeLog(sessionUserId, "delete", "Address", String.valueOf(id), "error:not_found");
             return ResponseEntity.notFound().build();
         }
         repository.deleteById(id);
-        logService.writeLog("system", "delete", "Address", String.valueOf(id), "success");
+        logService.writeLog(sessionUserId, "delete", "Address", String.valueOf(id), "success");
         return ResponseEntity.noContent().build();
     }
 }

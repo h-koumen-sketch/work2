@@ -53,7 +53,9 @@ const UserTable: React.FC = () => {
   // ユーザー一覧を取得
   const fetchUsers = async () => {
     try {
-      const response = await fetch("http://localhost:8081/users");
+      const response = await fetch("http://localhost:8081/users", {
+        credentials: "include"
+      });
       const userData = await response.json();
       setData(userData);
     } catch (err) {
@@ -68,13 +70,12 @@ const UserTable: React.FC = () => {
   // ユーザー復活処理
   const handleRestoreUser = async (userId: number) => {
     try {
-      const loginUserId = localStorage.getItem('userId') || '';
       const response = await fetch(`http://localhost:8081/users/restore/${userId}`, {
         method: "PUT",
         headers: {
-          "X-User-Id": loginUserId,
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
+        credentials: "include"
       });
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -159,9 +160,10 @@ const UserTable: React.FC = () => {
       const response = await fetch(url, {
         method,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(formData),
+        credentials: "include"
       });
 
       if (!response.ok) {
@@ -182,30 +184,15 @@ const UserTable: React.FC = () => {
       return;
     }
 
-    // try {
-    //   const response = await fetch(`http://localhost:8081/users/${userId}`, {
-    //     method: "DELETE",
-    //   });
-
-    //   if (!response.ok) {
-    //     throw new Error(`HTTP error! status: ${response.status}`);
-    //   }
-
-    //   await fetchUsers();
-    // } catch (err) {
-    //   console.error("Failed to delete user:", err);
-    //   alert("ユーザーの削除に失敗しました");
-    // }
     try {
 
-      const loginUserId = localStorage.getItem('userId') || '';
       const response = await fetch(`http://localhost:8081/users/delete/${userId}`, {
         method: "PUT",
         headers: {
-          "X-User-Id": loginUserId,
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify(formData),
+        credentials: "include",
+        body: JSON.stringify({})
       });
 
       if (!response.ok) {

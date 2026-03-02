@@ -45,10 +45,10 @@ const Login: React.FC = () => {
         return;
       }
       try {
-        const loginUserId = localStorage.getItem('userId') || '';
         const resp = await fetch(`http://localhost:8081/users/email/${encodeURIComponent(email)}/password`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'X-User-Id': loginUserId },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw })
         });
         const data = await resp.json();
@@ -89,6 +89,7 @@ const Login: React.FC = () => {
         const resp = await fetch('http://localhost:8081/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ email: userId, password }),
         });
 

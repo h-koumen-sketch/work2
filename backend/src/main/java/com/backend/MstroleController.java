@@ -10,7 +10,7 @@ import java.util.List;
  * Mstroleエンティティの操作APIを提供します。
  */
 @RestController
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 @RequestMapping("/api/mstrole")
 public class MstroleController {
     @Autowired
@@ -40,9 +40,12 @@ public class MstroleController {
      * @return ロール情報 or 404
      */
     @GetMapping("/{id}")
-    public Mstrole getById(@PathVariable Integer id) {
+    public Mstrole getById(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
+        String sessionUserId = session != null && session.getAttribute("userId") != null
+            ? String.valueOf(session.getAttribute("userId"))
+            : "system";
         return repository.findById(id).map(mstrole -> mstrole).orElseGet(() -> {
-            logService.writeLog("system", "getById", "Mstrole", String.valueOf(id), "error:not_found");
+            logService.writeLog(sessionUserId, "getById", "Mstrole", String.valueOf(id), "error:not_found");
             return null;
         });
     }
@@ -57,12 +60,15 @@ public class MstroleController {
      * @return 作成されたロール情報
      */
     @PostMapping("")
-    public Mstrole create(@RequestBody Mstrole mstrole) {
+    public Mstrole create(@RequestBody Mstrole mstrole, jakarta.servlet.http.HttpSession session) {
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         mstrole.setCreatedAt(now);
         mstrole.setUpdatedAt(now);
+        String sessionUserId = session != null && session.getAttribute("userId") != null
+            ? String.valueOf(session.getAttribute("userId"))
+            : "system";
         Mstrole saved = repository.save(mstrole);
-        logService.writeLog("system", "create", "Mstrole", String.valueOf(saved.getId()), "success");
+        logService.writeLog(sessionUserId, "create", "Mstrole", String.valueOf(saved.getId()), "success");
         return saved;
     }
 
@@ -77,14 +83,17 @@ public class MstroleController {
      * @return 更新されたロール情報 or 404
      */
     @PutMapping("/{id}")
-    public Mstrole update(@PathVariable Integer id, @RequestBody Mstrole mstrole) {
+    public Mstrole update(@PathVariable Integer id, @RequestBody Mstrole mstrole, jakarta.servlet.http.HttpSession session) {
+        String sessionUserId = session != null && session.getAttribute("userId") != null
+            ? String.valueOf(session.getAttribute("userId"))
+            : "system";
         if (!repository.existsById(id)) {
-            logService.writeLog("system", "update", "Mstrole", String.valueOf(id), "error:not_found");
+            logService.writeLog(sessionUserId, "update", "Mstrole", String.valueOf(id), "error:not_found");
             return null;
         }
         mstrole.setId(id);
         Mstrole saved = repository.save(mstrole);
-        logService.writeLog("system", "update", "Mstrole", String.valueOf(saved.getId()), "success");
+        logService.writeLog(sessionUserId, "update", "Mstrole", String.valueOf(saved.getId()), "success");
         return saved;
     }
 
@@ -98,15 +107,18 @@ public class MstroleController {
      * @return 復活後のロール情報
      */
     @PutMapping("/restore/{id}")
-    public Mstrole restore(@PathVariable Integer id) {
+    public Mstrole restore(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
+        String sessionUserId = session != null && session.getAttribute("userId") != null
+            ? String.valueOf(session.getAttribute("userId"))
+            : "system";
         return repository.findById(id).map(mstrole -> {
             mstrole.setDeletedAt(null);
             mstrole.setUpdatedAt(java.time.LocalDateTime.now());
             Mstrole saved = repository.save(mstrole);
-            logService.writeLog("system", "restore", "Mstrole", String.valueOf(saved.getId()), "success");
+            logService.writeLog(sessionUserId, "restore", "Mstrole", String.valueOf(saved.getId()), "success");
             return saved;
         }).orElseGet(() -> {
-            logService.writeLog("system", "restore", "Mstrole", String.valueOf(id), "error:not_found");
+            logService.writeLog(sessionUserId, "restore", "Mstrole", String.valueOf(id), "error:not_found");
             return null;
         });
     }
@@ -121,15 +133,18 @@ public class MstroleController {
      * @return 論理削除されたロール情報 or 404
      */
     @PutMapping("/delete/{id}")
-    public Mstrole softDelete(@PathVariable Integer id) {
+    public Mstrole softDelete(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
+        String sessionUserId = session != null && session.getAttribute("userId") != null
+            ? String.valueOf(session.getAttribute("userId"))
+            : "system";
         return repository.findById(id).map(mstrole -> {
             mstrole.setUpdatedAt(java.time.LocalDateTime.now());
             mstrole.setDeletedAt(java.time.LocalDateTime.now());
             Mstrole saved = repository.save(mstrole);
-            logService.writeLog("system", "softDelete", "Mstrole", String.valueOf(saved.getId()), "success");
+            logService.writeLog(sessionUserId, "softDelete", "Mstrole", String.valueOf(saved.getId()), "success");
             return saved;
         }).orElseGet(() -> {
-            logService.writeLog("system", "softDelete", "Mstrole", String.valueOf(id), "error:not_found");
+            logService.writeLog(sessionUserId, "softDelete", "Mstrole", String.valueOf(id), "error:not_found");
             return null;
         });
     }

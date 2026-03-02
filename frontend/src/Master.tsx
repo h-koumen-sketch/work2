@@ -1,4 +1,3 @@
-
 import RestoreIcon from '@mui/icons-material/Restore';
 
 import React, { useEffect, useState } from "react";
@@ -132,14 +131,14 @@ const masterApi: Record<MasterType, string> = {
 };
 
 // 削除用エンドポイント（論理削除はPUT、物理削除はDELETE）
-const masterDeleteApi: Record<MasterType, { url: (id: number) => string; method: "PUT" | "DELETE" }> = {
-  mstrole: { url: (id) => `/api/mstrole/delete/${id}`, method: "PUT" },
-  mstcategory: { url: (id) => `/api/mstcategory/delete/${id}`, method: "PUT" },
+const masterDeleteApi: Record<MasterType, { url: (id: number) => string; method: "PUT" | "DELETE"; credentials?: "include" }> = {
+  mstrole: { url: (id) => `/api/mstrole/delete/${id}`, method: "PUT", credentials: "include" },
+  mstcategory: { url: (id) => `/api/mstcategory/delete/${id}`, method: "PUT", credentials: "include" },
 };
 // 編集（更新）用エンドポイントとHTTPメソッド
-const masterEditApi: Record<MasterType, { url: (id: number) => string; method: "PUT" | "POST" }> = {
-  mstrole: { url: (id) => `/api/mstrole/${id}`, method: "PUT" },
-  mstcategory: { url: (id) => `/api/mstcategory/${id}`, method: "PUT" },
+const masterEditApi: Record<MasterType, { url: (id: number) => string; method: "PUT" | "POST"; credentials?: "include" }> = {
+  mstrole: { url: (id) => `/api/mstrole/${id}`, method: "PUT", credentials: "include" },
+  mstcategory: { url: (id) => `/api/mstcategory/${id}`, method: "PUT", credentials: "include" },
 };
 
 const Master: React.FC = () => {
@@ -151,7 +150,9 @@ const Master: React.FC = () => {
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
 
   useEffect(() => {
-    fetch(`http://localhost:8081${masterApi[selectedMaster]}`)
+    fetch(`http://localhost:8081${masterApi[selectedMaster]}`, {
+      credentials: "include"
+    })
       .then((res) => res.json())
       .then((data) => {
         setData(Array.isArray(data) ? data : []);
@@ -173,10 +174,15 @@ const Master: React.FC = () => {
     try {
       const { url, method } = masterDeleteApi[selectedMaster];
       const endpoint = `http://localhost:8081${url(id)}`;
-      const res = await fetch(endpoint, { method });
+      const res = await fetch(endpoint, {
+        method,
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("削除に失敗しました");
       // 削除後にテーブルを再取得して最新状態にする
-      fetch(`http://localhost:8081${masterApi[selectedMaster]}`)
+      fetch(`http://localhost:8081${masterApi[selectedMaster]}`, {
+        credentials: "include"
+      })
         .then((res) => res.json())
         .then((data) => {
           setData(Array.isArray(data) ? data : []);
@@ -260,10 +266,13 @@ const masterCreateApi: Record<MasterType, { url: string; method: "POST" }> = {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
+        credentials: "include"
       });
       if (!res.ok) throw new Error('追加に失敗しました');
       // 成功時は再取得
-      fetch(`http://localhost:8081${masterApi[selectedMaster]}`)
+      fetch(`http://localhost:8081${masterApi[selectedMaster]}`, {
+        credentials: "include"
+      })
         .then((res) => res.json())
         .then((data) => {
           setData(Array.isArray(data) ? data : []);
@@ -301,10 +310,13 @@ const masterCreateApi: Record<MasterType, { url: string; method: "POST" }> = {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
+        credentials: "include"
       });
       if (!res.ok) throw new Error('更新に失敗しました');
       // 成功時は再取得
-      fetch(`http://localhost:8081${masterApi[selectedMaster]}`)
+      fetch(`http://localhost:8081${masterApi[selectedMaster]}`, {
+        credentials: "include"
+      })
         .then((res) => res.json())
         .then((data) => {
           setData(Array.isArray(data) ? data : []);
@@ -326,10 +338,15 @@ const masterRestoreApi: Record<MasterType, { url: (id: number) => string; method
     try {
       const { url, method } = masterRestoreApi[selectedMaster];
       const endpoint = `http://localhost:8081${url(id)}`;
-      const res = await fetch(endpoint, { method });
+      const res = await fetch(endpoint, {
+        method,
+        credentials: "include"
+      });
       if (!res.ok) throw new Error('復活に失敗しました');
       // 復活後は再取得
-      fetch(`http://localhost:8081${masterApi[selectedMaster]}`)
+      fetch(`http://localhost:8081${masterApi[selectedMaster]}`, {
+        credentials: "include"
+      })
         .then((res) => res.json())
         .then((data) => {
           setData(Array.isArray(data) ? data : []);
