@@ -1,5 +1,9 @@
 import DownloadIcon from '@mui/icons-material/Download';
+import UploadIcon from '@mui/icons-material/Upload';
+import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 import * as FileSaver from 'file-saver';
+import { Alert, CircularProgress, OutlinedInput } from '@mui/material';
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MaterialReactTable, useMaterialReactTable, type MRT_ColumnDef } from "material-react-table";
@@ -22,6 +26,7 @@ import {
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, Refresh as RefreshIcon } from "@mui/icons-material";
 import { fetchAddressByPostalCode } from "./postalUtil";
 import { formatDateTime } from "./dateUtil";
+import SessionExpiredMessage from "./SessionExpiredMessage";
 
 type Address = {
   id: number;
@@ -44,6 +49,156 @@ type MstCategory = { id: number; name: string; deletedAt?: string | null };
 
 
 const Table: React.FC = () => {
+  // インポートバリデーション
+  // 英語・日本語カラム対応マッピング
+  const columnMap: Record<string, string> = {
+    name: "name", 名前: "name",
+    phoneNumber: "phoneNumber", 電話番号: "phoneNumber",
+    address: "address", 住所: "address",
+    age: "age", 年齢: "age",
+    sex: "sex", 性別: "sex",
+    category: "category", カテゴリ: "category",
+    role: "role", 役職: "role"
+  };
+  const allowedKeys = Object.keys(columnMap);
+  const requiredKeys = ["name", "phoneNumber", "address", "age", "sex", "category", "role"];
+
+  // 入力行を英語カラムに変換
+  const normalizeRow = (row: any) => {
+    const norm: any = {};
+    Object.keys(row).forEach(k => {
+      if (columnMap[k]) norm[columnMap[k]] = row[k];
+    });
+    return norm;
+  };
+
+  // 追加・編集ダイアログと同じバリデーションを流用
+  const validateImportRow = (row: any) => {
+    const errors: Record<string, string> = {};
+    // 不要な列チェック
+    const extraKeys = Object.keys(row).filter(k => !allowedKeys.includes(k));
+    if (extraKeys.length > 0) {
+      requiredKeys.forEach(key => {
+        errors[key] = `不要な列(${extraKeys.join(",")})が含まれています`;
+      });
+      extraKeys.forEach(key => {
+        errors[key] = `不要な列(${key})です`;
+      });
+      return errors;
+    }
+    // 英語カラムに変換
+    const norm = normalizeRow(row);
+    // 空行判定: 全項目が空・null・undefined
+    const isEmptyRow = requiredKeys.every(key => {
+      const v = norm[key];
+      if (v === undefined || v === null) return true;
+      if (typeof v === "string") {
+        if (v.trim() === "") return true;
+        return false;
+      }
+      if (key === "age") {
+        if (v === "" || isNaN(Number(v))) return true;
+        return false;
+      }
+      return false;
+    });
+    // name
+    if (!norm.name || String(norm.name).trim() === "") errors.name = "名前は必須です";
+    else if (String(norm.name).length > 255) errors.name = "名前は255文字以内で入力してください";
+    // phoneNumber
+    if (!norm.phoneNumber || String(norm.phoneNumber).trim() === "") errors.phoneNumber = "電話番号は必須です";
+    else if (!/^0\d{9,10}$/.test(String(norm.phoneNumber))) errors.phoneNumber = "正しい電話番号を入力してください";
+    // address
+    if (!norm.address || String(norm.address).trim() === "") errors.address = "住所は必須です";
+    else if (String(norm.address).length > 255) errors.address = "住所は255文字以内で入力してください";
+    // age
+    if (
+      norm.age === undefined ||
+      norm.age === null ||
+      (typeof norm.age === 'string' && norm.age.trim() === '') ||
+      isNaN(Number(norm.age)) ||
+      !/^\d+$/.test(String(norm.age))
+    ) {
+      errors.age = "年齢は必須です（0～120の半角数字のみ）";
+    } else if (Number(norm.age) < 0 || Number(norm.age) > 120) {
+      errors.age = "0～120の数値で入力してください";
+    }
+    // sex
+    if (!norm.sex) {
+      errors.sex = "性別は必須です";
+    } else {
+      // 厳密一致（例：女性1などはNG）
+      const validSex = ["male", "female", "other", "男性", "女性", "その他"];
+      if (!validSex.some(s => String(norm.sex).trim() === s)) {
+        errors.sex = "性別は男性・女性・その他のみ指定可能です";
+      }
+    }
+    // category（マスタ比較）
+    let categoryId: number | undefined = undefined;
+    if (
+      norm.category === undefined ||
+      norm.category === null ||
+      norm.category === ''
+    ) {
+      errors.category = "カテゴリは必須です";
+    } else {
+      // 必須エラーがなければマスタ存在チェック
+      if (!errors.category) {
+        if (typeof norm.category === 'number') {
+          const found = mstcategories.find(c => c.id === norm.category && !c.deletedAt);
+          if (!found) errors.category = "カテゴリがマスタに存在しません";
+          else categoryId = found.id;
+        } else {
+          const found = mstcategories.find(c => c.name === norm.category && !c.deletedAt);
+          if (!found) errors.category = "カテゴリがマスタに存在しません";
+          else categoryId = found.id;
+        }
+      }
+    }
+    // role（マスタ比較）
+    let roleId: number | undefined = undefined;
+    if (
+      norm.role === undefined ||
+      norm.role === null ||
+      norm.role === ''
+    ) {
+      errors.role = "役職は必須です";
+    } else {
+      // 必須エラーがなければマスタ存在チェック
+      if (!errors.role) {
+        if (typeof norm.role === 'number') {
+          const found = mstroles.find(r => r.id === norm.role && !r.deletedAt);
+          if (!found) errors.role = "役職がマスタに存在しません";
+          else roleId = found.id;
+        } else {
+          const found = mstroles.find(r => r.name === norm.role && !r.deletedAt);
+          if (!found) errors.role = "役職がマスタに存在しません";
+          else roleId = found.id;
+        }
+      }
+    }
+    if (isEmptyRow) {
+      requiredKeys.forEach(key => {
+        errors[key] = "空行です";
+      });
+    }
+    return errors;
+  };
+  // インポートプレビュー用
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  // インポートダイアログ状態
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+
+  // インポートダイアログを閉じるときにファイル・プレビュー・エラーもクリア
+  const handleCloseImportDialog = () => {
+    setImportDialogOpen(false);
+    setImportFile(null);
+    setImportPreview([]);
+    setImportError(null);
+  };
   // CSV出力処理
   const handleExportCSV = () => {
     const csvRows = [];
@@ -124,8 +279,16 @@ const Table: React.FC = () => {
   // カテゴリ（mstcategory）一覧を取得
   const [mstcategories, setMstcategories] = useState<MstCategory[]>([]);
   useEffect(() => {
-    fetch("http://localhost:8081/api/mstcategory")
-      .then(res => res.json())
+    fetch("http://localhost:8081/api/mstcategory", {
+      credentials: "include"
+    })
+      .then(res => {
+        if (res.status === 401 || res.status === 403) {
+          setSessionExpired(true);
+          return null;
+        }
+        return res.json();
+      })
       .then(data => {
         if (Array.isArray(data)) setMstcategories(data);
       });
@@ -138,12 +301,17 @@ const Table: React.FC = () => {
   // }, []);
 
 
-  // ユーザー一覧を取得
+  const [sessionExpired, setSessionExpired] = useState(false);
+
   const fetchAddresses = async () => {
     try {
       const response = await fetch("http://localhost:8081/address", {
         credentials: "include"
       });
+      if (response.status === 401 || response.status === 403) {
+        setSessionExpired(true);
+        return;
+      }
       const userData = await response.json();
       setData(userData);
     } catch (err) {
@@ -161,8 +329,16 @@ const Table: React.FC = () => {
     fetch("http://localhost:8081/api/mstrole", {
       credentials: "include"
     })
-      .then((res) => res.json())
-      .then((data) => setMstroles(data));
+      .then((res) => {
+        if (res.status === 401 || res.status === 403) {
+          setSessionExpired(true);
+          return null;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data) setMstroles(data);
+      });
   }, []);
 
   // ダイアログを閉じる
@@ -302,6 +478,10 @@ const Table: React.FC = () => {
         credentials: "include"
       });
 
+      if (response.status === 401 || response.status === 403) {
+        setSessionExpired(true);
+        return;
+      }
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -320,21 +500,6 @@ const Table: React.FC = () => {
       return;
     }
 
-    // try {
-    //   const response = await fetch(`http://localhost:8081/address/${addressId}`, {
-    //     method: "DELETE",
-    //   });
-
-    //   if (!response.ok) {
-    //     throw new Error(`HTTP error! status: ${response.status}`);
-    //   }
-
-    //   await fetchAddresses();
-    // } catch (err) {
-    //   console.error("Failed to delete address:", err);
-    //   alert("住所の削除に失敗しました");
-    // }
-
     try {
       const response = await fetch(`http://localhost:8081/address/delete/${addressId}`, {
         method: "PUT",
@@ -344,6 +509,10 @@ const Table: React.FC = () => {
         credentials: "include"
       });
 
+      if (response.status === 401 || response.status === 403) {
+        setSessionExpired(true);
+        return;
+      }
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -479,156 +648,454 @@ const Table: React.FC = () => {
 
   return (
     <>
-      <Box sx={{ mb: 2, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleOpenCreateDialog}
-        >
-          新規住所追加
-        </Button>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Button
-            variant="outlined"
-            sx={{ ml: 2 }}
-            startIcon={<RefreshIcon />}
-            onClick={fetchAddresses}
-          >
-            再読み込み
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={handleExportCSV}
-          >
-            CSV出力
-          </Button>
-        </Box>
-      </Box>
-
-      <MaterialReactTable table={table} />
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {isEditing ? "住所を編集" : "新規住所を追加"}
-        </DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <form
-            onKeyDown={e => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleSaveAddress();
-              }
-            }}
-          >
-            <TextField
-              autoFocus
-              label="名前"
-              value={formData.name}
-              onChange={(e) => handleFormChange("name", e.target.value)}
-              fullWidth
-              margin="normal"
-              error={!!formErrors.name}
-              helperText={formErrors.name}
-            />
-            <TextField
-              label="郵便番号（7桁）"
-              value={postalCode}
-              onChange={(e) => handlePostalCodeChange(e.target.value.replace(/[^0-9]/g, ""))}
-              fullWidth
-              margin="normal"
-              inputProps={{ maxLength: 7 }}
-              helperText={postalError ? postalError : "入力で自動住所取得"}
-              error={!!postalError}
-              disabled={postalLoading}
-            />
-            <TextField
-              label="住所名"
-              value={formData.address}
-              onChange={(e) => handleFormChange("address", e.target.value)}
-              fullWidth
-              margin="normal"
-              error={!!formErrors.address}
-              helperText={formErrors.address}
-            />
-            <TextField
-              label="電話番号"
-              value={formData.phoneNumber}
-              onChange={(e) => handleFormChange("phoneNumber", e.target.value)}
-              fullWidth
-              margin="normal"
-              error={!!formErrors.phoneNumber}
-              helperText={formErrors.phoneNumber}
-            />
-            <TextField
-              label="年齢"
-              type="number"
-              value={formData.age}
-              onChange={(e) => {
-                const val = e.target.value;
-                handleFormChange("age", val === "" ? "" : Number(val));
-              }}
-              fullWidth
-              margin="normal"
-              error={!!formErrors.age}
-              helperText={formErrors.age}
-              inputProps={{ min: 0, max: 120 }}
-            />
-            <FormControl fullWidth margin="normal" error={!!formErrors.sex}>
-              <InputLabel>性別</InputLabel>
-              <Select
-                value={formData.sex ?? ""}
-                label="性別"
-                onChange={(e) => handleFormChange("sex", e.target.value)}
-                displayEmpty
+      {sessionExpired ? (
+        <SessionExpiredMessage onLogin={() => window.location.href = "/"} />
+      ) : (
+        <>
+          <Box sx={{ mb: 2, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleOpenCreateDialog}
+            >
+              新規住所追加
+            </Button>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<UploadIcon />}
+                onClick={() => {
+                  // マスタ未取得なら何もしない
+                  if (mstcategories.length === 0 || mstroles.length === 0) return;
+                  setImportDialogOpen(true);
+                }}
+                disabled={mstcategories.length === 0 || mstroles.length === 0}
               >
-                <MenuItem value="male">男性</MenuItem>
-                <MenuItem value="female">女性</MenuItem>
-                <MenuItem value="other">その他</MenuItem>
-              </Select>
-              {formErrors.sex && (
-                <Box sx={{ color: 'error.main', fontSize: 12, mt: 0.5 }}>{formErrors.sex}</Box>
-              )}
-            </FormControl>
-          </form>
+                インポート
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={fetchAddresses}
+              >
+                再読み込み
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={handleExportCSV}
+              >
+                CSV出力
+              </Button>
+            </Box>
+          </Box>
 
-          <FormControl fullWidth margin="normal" error={!!formErrors.category}>
-            <InputLabel>カテゴリ</InputLabel>
-            <Select
-              value={formData.category ?? ""}
-              label="カテゴリ"
-              onChange={(e) => handleFormChange("category", Number(e.target.value))}
-            >
-              {mstcategories.filter(cat => !cat.deletedAt).map(cat => (
-                <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
-              ))}
-            </Select>
-            {formErrors.category && (
-              <Box sx={{ color: 'error.main', fontSize: 12, mt: 0.5 }}>{formErrors.category}</Box>
-            )}
-          </FormControl>
-          <FormControl fullWidth margin="normal" error={!!formErrors.role}>
-            <InputLabel>役職</InputLabel>
-            <Select
-              value={formData.role ?? ""}
-              label="役職"
-              onChange={(e) => handleFormChange("role", Number(e.target.value))}
-            >
-              {mstroles.filter(role => !role.deletedAt).map(role => (
-                <MenuItem key={role.id} value={role.id}>{role.name}</MenuItem>
-              ))}
-            </Select>
-            {formErrors.role && (
-              <Box sx={{ color: 'error.main', fontSize: 12, mt: 0.5 }}>{formErrors.role}</Box>
-            )}
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>キャンセル</Button>
-          <Button onClick={handleSaveAddress} variant="contained">
-            保存
-          </Button>
-        </DialogActions>
-      </Dialog>
+          <MaterialReactTable table={table} />
+          <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+            <DialogTitle>
+              {isEditing ? "住所を編集" : "新規住所を追加"}
+            </DialogTitle>
+            <DialogContent sx={{ pt: 2 }}>
+              <form
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSaveAddress();
+                  }
+                }}
+              >
+                <TextField
+                  autoFocus
+                  label="名前"
+                  value={formData.name}
+                  onChange={(e) => handleFormChange("name", e.target.value)}
+                  fullWidth
+                  margin="normal"
+                  error={!!formErrors.name}
+                  helperText={formErrors.name}
+                />
+                <TextField
+                  label="郵便番号（7桁）"
+                  value={postalCode}
+                  onChange={(e) => handlePostalCodeChange(e.target.value.replace(/[^0-9]/g, ""))}
+                  fullWidth
+                  margin="normal"
+                  inputProps={{ maxLength: 7 }}
+                  helperText={postalError ? postalError : "入力で自動住所取得"}
+                  error={!!postalError}
+                  disabled={postalLoading}
+                />
+                <TextField
+                  label="住所名"
+                  value={formData.address}
+                  onChange={(e) => handleFormChange("address", e.target.value)}
+                  fullWidth
+                  margin="normal"
+                  error={!!formErrors.address}
+                  helperText={formErrors.address}
+                />
+                <TextField
+                  label="電話番号"
+                  value={formData.phoneNumber}
+                  onChange={(e) => handleFormChange("phoneNumber", e.target.value)}
+                  fullWidth
+                  margin="normal"
+                  error={!!formErrors.phoneNumber}
+                  helperText={formErrors.phoneNumber}
+                />
+                <TextField
+                  label="年齢"
+                  type="number"
+                  value={formData.age}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    handleFormChange("age", val === "" ? "" : Number(val));
+                  }}
+                  fullWidth
+                  margin="normal"
+                  error={!!formErrors.age}
+                  helperText={formErrors.age}
+                  inputProps={{ min: 0, max: 120 }}
+                />
+                <FormControl fullWidth margin="normal" error={!!formErrors.sex}>
+                  <InputLabel>性別</InputLabel>
+                  <Select
+                    value={formData.sex ?? ""}
+                    label="性別"
+                    onChange={(e) => handleFormChange("sex", e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="male">男性</MenuItem>
+                    <MenuItem value="female">女性</MenuItem>
+                    <MenuItem value="other">その他</MenuItem>
+                  </Select>
+                  {formErrors.sex && (
+                    <Box sx={{ color: 'error.main', fontSize: 12, mt: 0.5 }}>{formErrors.sex}</Box>
+                  )}
+                </FormControl>
+              </form>
+
+              <FormControl fullWidth margin="normal" error={!!formErrors.category}>
+                <InputLabel>カテゴリ</InputLabel>
+                <Select
+                  value={formData.category ?? ""}
+                  label="カテゴリ"
+                  onChange={(e) => handleFormChange("category", Number(e.target.value))}
+                >
+                  {mstcategories.filter(cat => !cat.deletedAt).map(cat => (
+                    <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                  ))}
+                </Select>
+                {formErrors.category && (
+                  <Box sx={{ color: 'error.main', fontSize: 12, mt: 0.5 }}>{formErrors.category}</Box>
+                )}
+              </FormControl>
+              <FormControl fullWidth margin="normal" error={!!formErrors.role}>
+                <InputLabel>役職</InputLabel>
+                <Select
+                  value={formData.role ?? ""}
+                  label="役職"
+                  onChange={(e) => handleFormChange("role", Number(e.target.value))}
+                >
+                  {mstroles.filter(role => !role.deletedAt).map(role => (
+                    <MenuItem key={role.id} value={role.id}>{role.name}</MenuItem>
+                  ))}
+                </Select>
+                {formErrors.role && (
+                  <Box sx={{ color: 'error.main', fontSize: 12, mt: 0.5 }}>{formErrors.role}</Box>
+                )}
+              </FormControl>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDialog}>キャンセル</Button>
+              <Button onClick={handleSaveAddress} variant="contained">
+                保存
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* インポートダイアログ */}
+            <Dialog open={importDialogOpen} onClose={handleCloseImportDialog} maxWidth="xl" fullWidth>
+            <DialogTitle>CSV/Excelインポート</DialogTitle>
+            <DialogContent sx={{ minWidth: 1000 }}>
+              <Box sx={{ my: 2 }}>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  sx={{ mb: 2 }}
+                >
+                  ファイルを選択
+                  <input
+                    type="file"
+                    hidden
+                    accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                    onChange={async e => {
+                      setImportError(null);
+                      const file = e.target.files?.[0] ?? null;
+                      setImportFile(file);
+                      setImportPreview([]);
+                      // input要素のvalueをリセット
+                      e.target.value = '';
+                      if (file) {
+                        try {
+                          let preview: any[] = [];
+                          if (file.name.endsWith('.csv')) {
+                            const text = await file.text();
+                            const result = Papa.parse(text, { header: true });
+                            if (result.errors.length) throw new Error('CSVパースエラー');
+                            preview = result.data;
+                          } else {
+                            const data = await file.arrayBuffer();
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                            preview = XLSX.utils.sheet_to_json(sheet);
+                          }
+                          setImportPreview(preview);
+                        } catch (err: any) {
+                          setImportError('ファイルの読み込みに失敗しました');
+                        }
+                      }
+                    }}
+                  />
+                </Button>
+                {importFile && <Box sx={{ mb: 2, fontSize: 14 }}>選択中: {importFile.name}</Box>}
+                {importError && <Alert severity="error" sx={{ mb: 2 }}>{importError}</Alert>}
+                {importLoading && <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}><CircularProgress /></Box>}
+                <Box sx={{ fontSize: 14, color: 'text.secondary', mb: 1 }}>
+                  {/* プレビュー表示 */}
+                  {importPreview.length > 0 && (
+                    <Box sx={{ maxHeight: 300, overflow: 'auto', mb: 2, border: '1px solid #ddd', borderRadius: 1, p: 1 }}>
+                      <Box sx={{ fontWeight: 'bold', mb: 1 }}>プレビュー</Box>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ borderBottom: '1px solid #ccc', padding: '4px', background: '#f5f5f5', width: 40 }}>#</th>
+                            {Object.keys(importPreview[0]).map((key) => (
+                              <th key={key} style={{ borderBottom: '1px solid #ccc', padding: '4px', background: '#f5f5f5' }}>{key}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importPreview.map((row, idx) => {
+                            const errors = validateImportRow(row);
+                            return (
+                              <tr key={idx}>
+                                <td style={{ borderBottom: '1px solid #eee', padding: '4px', background: '#f5f5f5', textAlign: 'right', color: '#888' }}>{idx + 1}</td>
+                                {Object.keys(importPreview[0]).map((key) => {
+                                  let isError = !!errors[key];
+                                  let errorMsg = '';
+                                  // ...existing code...
+                                  if ((key === 'category' || key === 'カテゴリ')) {
+                                    if (errors['category'] === 'カテゴリは必須です') {
+                                      isError = true;
+                                      errorMsg = errors['category'];
+                                    } else if (errors['category']) {
+                                      isError = true;
+                                      errorMsg = errors['category'];
+                                    }
+                                  } else if ((key === 'role' || key === '役職')) {
+                                    if (errors['role'] === '役職は必須です') {
+                                      isError = true;
+                                      errorMsg = errors['role'];
+                                    } else if (errors['role']) {
+                                      isError = true;
+                                      errorMsg = errors['role'];
+                                    }
+                                  } else if ((key === 'sex' || key === '性別') && errors['sex']) {
+                                    isError = true;
+                                    errorMsg = errors['sex'];
+                                  } else if ((key === 'age' || key === '年齢') && errors['age']) {
+                                    isError = true;
+                                    errorMsg = errors['age'];
+                                  } else if ((key === 'name' || key === '名前') && errors['name']) {
+                                    isError = true;
+                                    errorMsg = errors['name'];
+                                  } else if ((key === 'address' || key === '住所') && errors['address']) {
+                                    isError = true;
+                                    errorMsg = errors['address'];
+                                  } else if ((key === 'phoneNumber' || key === '電話番号') && errors['phoneNumber']) {
+                                    isError = true;
+                                    errorMsg = errors['phoneNumber'];
+                                  }
+                                  return (
+                                    <td
+                                      key={key}
+                                      style={{
+                                        borderBottom: '1px solid #eee',
+                                        padding: '4px',
+                                        background: isError ? '#ffeaea' : undefined,
+                                        position: 'relative',
+                                        cursor: isError ? 'help' : undefined
+                                      }}
+                                      title={errorMsg}
+                                    >
+                                      {row[key]}
+                                      {isError && (
+                                        <span style={{ color: '#d32f2f', fontSize: 11, marginLeft: 4 }}>
+                                          ※
+                                        </span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      <Box sx={{ fontSize: 12, color: '#d32f2f', mt: 1 }}>
+                        赤背景・※付きは不正項目です。セルにマウスを乗せるとエラー内容が表示されます。
+                      </Box>
+                    </Box>
+                  )}
+                  <Box sx={{ mt: 2, fontSize: 14, color: 'text.secondary' }}>
+                    <b>CSV/Excelファイルのフォーマット例：</b><br />
+                    <span style={{ fontFamily: 'monospace', background: '#f5f5f5', padding: '2px 6px', borderRadius: '4px' }}>
+                      name,address,phoneNumber,age,sex,category,role
+                    </span><br />
+                    <br />
+                    <b>各項目の説明：</b><br />
+                    ・<b>name</b>：名前（必須）<br />
+                    ・<b>address</b>：住所（必須）<br />
+                    ・<b>phoneNumber</b>：電話番号（必須、0から始まる10～11桁の数字）<br />
+                    ・<b>age</b>：年齢（必須、0～120の半角数字）<br />
+                    ・<b>sex</b>：性別（必須、「男性」「女性」「その他」または「male」「female」「other」）<br />
+                    ・<b>category</b>：カテゴリ（必須、マスタに登録されているカテゴリ名またはID）<br />
+                    ・<b>role</b>：役職（必須、マスタに登録されている役職名またはID）<br />
+                    <br />
+                    <b>注意事項：</b><br />
+                    ・Excelの場合も1行目に上記ヘッダーが必要です。<br />
+                    ・カテゴリ・役職はマスタに存在するもののみ指定してください。<br />
+                    ・不正な項目は赤背景で表示されます。<br />
+                  </Box>
+                </Box>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={handleCloseImportDialog}>キャンセル</Button>
+                <Button
+                  variant="contained"
+                  disabled={!importFile || importLoading || mstcategories.length === 0 || mstroles.length === 0}
+                  onClick={async () => {
+                    if (!importFile || mstcategories.length === 0 || mstroles.length === 0) return;
+                    setImportLoading(true);
+                    setImportError(null);
+                    try {
+                      let imported: any[] = [];
+                      if (importFile.name.endsWith('.csv')) {
+                        const text = await importFile.text();
+                        const result = Papa.parse(text, { header: true });
+                        if (result.errors.length) throw new Error('CSVパースエラー');
+                        imported = result.data;
+                      } else {
+                        const data = await importFile.arrayBuffer();
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        imported = XLSX.utils.sheet_to_json(sheet);
+                      }
+                      // バリデーションエラー件数をカウント
+                      let validationErrorCount = 0;
+                      const validRows = imported.filter(row => {
+                        const errors = validateImportRow(row);
+                        const isValid = Object.keys(errors).length === 0;
+                        if (!isValid) validationErrorCount++;
+                        return isValid;
+                      });
+                      if (validationErrorCount > 0) {
+                        setImportLoading(false);
+                        if (validRows.length === 0) {
+                          alert(`${validationErrorCount}件のデータに不正があります。赤背景の行を修正してください。`);
+                          return;
+                        }
+                        const proceed = window.confirm(`${validationErrorCount}件のデータに不正があります。エラー以外の${validRows.length}件のみ登録しますか？`);
+                        if (!proceed) return;
+                        setImportLoading(true);
+                      }
+                      if (!validRows.length) throw new Error('有効なデータがありません');
+                      // 英語カラムに変換し、カテゴリ・役職はマスタID、性別はmale/female/otherに変換
+                      const toPostRow = (row: any) => {
+                        const norm: any = {};
+                        requiredKeys.forEach(key => {
+                          for (const k in columnMap) {
+                            if (columnMap[k] === key && row[k] !== undefined) {
+                              // カテゴリ
+                              if (key === 'category') {
+                                let val = row[k];
+                                let found = typeof val === 'number'
+                                  ? mstcategories.find(c => c.id === val && !c.deletedAt)
+                                  : mstcategories.find(c => c.name === val && !c.deletedAt);
+                                norm[key] = found ? found.id : null;
+                              }
+                              // 役職
+                              else if (key === 'role') {
+                                let val = row[k];
+                                let found = typeof val === 'number'
+                                  ? mstroles.find(r => r.id === val && !r.deletedAt)
+                                  : mstroles.find(r => r.name === val && !r.deletedAt);
+                                norm[key] = found ? found.id : null;
+                              }
+                              // 性別
+                              else if (key === 'sex') {
+                                let val = row[k];
+                                if (val === '男性' || val === 'male') norm[key] = 'male';
+                                else if (val === '女性' || val === 'female') norm[key] = 'female';
+                                else if (val === 'その他' || val === 'other') norm[key] = 'other';
+                                else norm[key] = val;
+                              }
+                              else {
+                                norm[key] = row[k];
+                              }
+                              break;
+                            }
+                          }
+                        });
+                        return norm;
+                      };
+                      let errorCount = 0;
+                      for (const row of validRows) {
+                        const postRow = toPostRow(row);
+                        console.log('インポート送信データ:', postRow);
+                        try {
+                          const response = await fetch('http://localhost:8081/address', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(postRow),
+                            credentials: 'include',
+                          });
+                          if (!response.ok) {
+                            errorCount++;
+                          }
+                        } catch {
+                          errorCount++;
+                        }
+                      }
+                      await fetchAddresses();
+                      setImportDialogOpen(false);
+                      setImportFile(null);
+                      setImportPreview([]);
+                      setImportError(null);
+                      setImportLoading(false);
+                      if (errorCount > 0) {
+                        if (errorCount === validRows.length) {
+                          alert('全件の登録に失敗しました');
+                        } else {
+                          alert(`${errorCount}件の登録に失敗しました`);
+                        }
+                      } else {
+                        alert(`インポートが完了しました（${validRows.length}件登録）`);
+                      }
+                    } catch (err: any) {
+                      setImportError(err.message || 'インポートに失敗しました');
+                      setImportLoading(false);
+                    }
+                  }}
+              >
+                インポート実行
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </>
+      )}
     </>
   );
 };

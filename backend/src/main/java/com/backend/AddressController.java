@@ -39,8 +39,11 @@ public class AddressController {
          * @return 削除済み住所リスト
          */
     @GetMapping("/address/deleted")
-    public List<Address> getDeletedAddresses() {
-        return repository.findByDeletedAtIsNotNull();
+    public ResponseEntity<?> getDeletedAddresses(jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        return ResponseEntity.ok(repository.findByDeletedAtIsNotNull());
     }
 
     // 住所復活API
@@ -64,9 +67,10 @@ public class AddressController {
      */
     @PutMapping(value = "/address/restore/{id}")
     public ResponseEntity<Address> restore(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         Optional<Address> optionalAddress = repository.findById(id);
         if (optionalAddress.isEmpty()) {
             logService.writeLog(sessionUserId, "restore", "Address", String.valueOf(id), "error:not_found");
@@ -98,8 +102,11 @@ public class AddressController {
      * @return 住所リスト
      */
     @GetMapping("/address")
-    public List<Address> getAll() {
-        return repository.findByDeletedAtIsNull();
+    public ResponseEntity<?> getAll(jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        return ResponseEntity.ok(repository.findByDeletedAtIsNull());
     }
 
     /**
@@ -111,7 +118,10 @@ public class AddressController {
      * @return 住所情報 or 404
      */
     @GetMapping("/address/{id}")
-    public ResponseEntity<Address> getById(@PathVariable Long id) {
+    public ResponseEntity<?> getById(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         Optional<Address> address = repository.findById(id);
         System.out.println("getById called with id: " + id);
         return address.map(ResponseEntity::ok)
@@ -130,9 +140,10 @@ public class AddressController {
      */
     @PostMapping(value = "/address")
     public ResponseEntity<Address> create(@RequestBody Address address, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         address.setCreatedAt(LocalDateTime.now());
         address.setUpdatedAt(LocalDateTime.now());
         Address savedAddress = repository.save(address);
@@ -152,9 +163,10 @@ public class AddressController {
      */
     @PutMapping(value = "/address/{id}")
     public ResponseEntity<Address> update(@PathVariable Long id, @RequestBody Address addressDetails, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         Optional<Address> optionalAddress = repository.findById(id);
         if (optionalAddress.isEmpty()) {
             logService.writeLog(sessionUserId, "update", "Address", String.valueOf(id), "error:not_found");
@@ -200,9 +212,10 @@ public class AddressController {
      */
     @PutMapping(value = "/address/delete/{id}")
     public ResponseEntity<Address> softDelete(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         Optional<Address> optionalAddress = repository.findById(id);
         if (optionalAddress.isEmpty()) {
             logService.writeLog(sessionUserId, "softDelete", "Address", String.valueOf(id), "error:not_found");
@@ -227,9 +240,10 @@ public class AddressController {
      */
     @DeleteMapping("/address/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         Optional<Address> address = repository.findById(id);
         if (address.isEmpty()) {
             logService.writeLog(sessionUserId, "delete", "Address", String.valueOf(id), "error:not_found");

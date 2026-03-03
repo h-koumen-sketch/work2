@@ -14,6 +14,7 @@ import AddressInfo from './AddressInfo';
 import AvatarInfo from './AvatarInfo';
 import AddressResurrection from './AddressResurrection';
 import Master from './Master';
+import ExternalAppDashboard from './ExternalAppDashboard';
 
 const Layout: React.FC = () => (
   <>
@@ -45,6 +46,7 @@ function App() {
                   <Route path="/address" element={<Table />} />
                   <Route path="/address/addressinfo" element={<AddressInfo />} />
                   <Route path="/color" element={<ColorChange />} />
+                  <Route path="/externalapps" element={<ExternalAppDashboard />} />
                   <Route path="/avatarinfo" element={<AvatarInfo />} />
                   <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
                   <Route path="/admin/usertable" element={<PrivateRoute><UserTable /></PrivateRoute>} />

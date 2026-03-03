@@ -167,7 +167,10 @@ public class UserController {
      * @return ユーザーリスト
      */
     @GetMapping("/users")
-    public List<User> getAll() {
+    public Object getAll(jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         return repository.findAll();
     }
 
@@ -180,7 +183,10 @@ public class UserController {
      * @return ユーザー情報 or 404
      */
     @GetMapping("/users/{id}")
-    public ResponseEntity<User> getById(@PathVariable Long id) {
+    public Object getById(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         Optional<User> user = repository.findById(id);
         return user.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -196,24 +202,18 @@ public class UserController {
      * @return 作成されたユーザー情報
      */
     @PostMapping("/users")
-    public ResponseEntity<User> create(@RequestBody User user) {
+    public Object create(@RequestBody User user, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         if (user.getPasswordHash() != null && !user.getPasswordHash().isEmpty()) {
             user.setPasswordHash(passwordEncoder.encode(user.getPasswordHash()));
         }
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
         User savedUser = repository.save(user);
-        // セッションからuserId取得
-        String sessionUserId = null;
-        jakarta.servlet.http.HttpSession session = null;
-        try {
-            session = ((org.springframework.web.context.request.ServletRequestAttributes) org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()).getRequest().getSession(false);
-        } catch (Exception e) {}
-        if (session != null && session.getAttribute("userId") != null) {
-            sessionUserId = String.valueOf(session.getAttribute("userId"));
-        }
-        logService.writeLog(sessionUserId != null ? sessionUserId : "system", "create", "User", String.valueOf(savedUser.getId()),
-                "success");
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
+        logService.writeLog(sessionUserId, "create", "User", String.valueOf(savedUser.getId()), "success");
         return ResponseEntity.status(HttpStatus.CREATED).body(savedUser);
     }
 
@@ -228,7 +228,10 @@ public class UserController {
      * @return 更新後のユーザー情報
      */
     @PutMapping("/users/{id}")
-    public ResponseEntity<User> update(@PathVariable Long id, @RequestBody User userDetails) {
+    public Object update(@PathVariable Long id, @RequestBody User userDetails, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         Optional<User> optionalUser = repository.findById(id);
         if (optionalUser.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -245,17 +248,8 @@ public class UserController {
         }
         user.setUpdatedAt(LocalDateTime.now());
         User updatedUser = repository.save(user);
-        // セッションからuserId取得
-        String sessionUserId = null;
-        jakarta.servlet.http.HttpSession session = null;
-        try {
-            session = ((org.springframework.web.context.request.ServletRequestAttributes) org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()).getRequest().getSession(false);
-        } catch (Exception e) {}
-        if (session != null && session.getAttribute("userId") != null) {
-            sessionUserId = String.valueOf(session.getAttribute("userId"));
-        }
-        logService.writeLog(sessionUserId != null ? sessionUserId : "system", "update", "User", String.valueOf(updatedUser.getId()),
-                "success");
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
+        logService.writeLog(sessionUserId, "update", "User", String.valueOf(updatedUser.getId()), "success");
         return ResponseEntity.ok(updatedUser);
     }
 
@@ -270,7 +264,10 @@ public class UserController {
      * @return 復活後のユーザー情報
      */
     @PutMapping("/users/restore/{id}")
-    public ResponseEntity<User> restore(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
+    public Object restore(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         Optional<User> optionalUser = repository.findById(id);
         if (optionalUser.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -279,7 +276,7 @@ public class UserController {
         user.setDeletedAt(null);
         user.setUpdatedAt(LocalDateTime.now());
         User updatedUser = repository.save(user);
-        String sessionUserId = (session != null && session.getAttribute("userId") != null) ? String.valueOf(session.getAttribute("userId")) : "system";
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         logService.writeLog(sessionUserId, "restore", "User", String.valueOf(updatedUser.getId()), "success");
         return ResponseEntity.ok(updatedUser);
     }
@@ -295,7 +292,10 @@ public class UserController {
      * @return 削除後のユーザー情報
      */
     @PutMapping("/users/delete/{id}")
-    public ResponseEntity<User> softDelete(@PathVariable Long id, @RequestBody User userDetails, jakarta.servlet.http.HttpSession session) {
+    public Object softDelete(@PathVariable Long id, @RequestBody User userDetails, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         Optional<User> optionalUser = repository.findById(id);
         if (optionalUser.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -304,7 +304,7 @@ public class UserController {
         user.setUpdatedAt(LocalDateTime.now());
         user.setDeletedAt(LocalDateTime.now());
         User updatedUser = repository.save(user);
-        String sessionUserId = (session != null && session.getAttribute("userId") != null) ? String.valueOf(session.getAttribute("userId")) : "system";
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         logService.writeLog(sessionUserId, "softDelete", "User", String.valueOf(updatedUser.getId()), "success");
         return ResponseEntity.ok(updatedUser);
     }
@@ -319,22 +319,17 @@ public class UserController {
      * @return 204 No Content
      */
     @DeleteMapping("/users/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public Object delete(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         Optional<User> user = repository.findById(id);
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
         repository.deleteById(id);
-        // セッションからuserId取得
-        String sessionUserId = null;
-        jakarta.servlet.http.HttpSession session = null;
-        try {
-            session = ((org.springframework.web.context.request.ServletRequestAttributes) org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()).getRequest().getSession(false);
-        } catch (Exception e) {}
-        if (session != null && session.getAttribute("userId") != null) {
-            sessionUserId = String.valueOf(session.getAttribute("userId"));
-        }
-        logService.writeLog(sessionUserId != null ? sessionUserId : "system", "delete", "User", String.valueOf(id), "success");
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
+        logService.writeLog(sessionUserId, "delete", "User", String.valueOf(id), "success");
         return ResponseEntity.noContent().build();
     }
 
@@ -377,9 +372,12 @@ public class UserController {
      * @return 変更結果（OK or エラー）
      */
     @PutMapping("/users/email/{email}/password")
-    public ResponseEntity<?> changePasswordByEmail(@PathVariable String email, @RequestBody ChangePasswordRequest req, jakarta.servlet.http.HttpSession session) {
+    public Object changePasswordByEmail(@PathVariable String email, @RequestBody ChangePasswordRequest req, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         Optional<User> optionalUser = repository.findByEmail(email);
-        String sessionUserId = (session != null && session.getAttribute("userId") != null) ? String.valueOf(session.getAttribute("userId")) : "system";
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         if (optionalUser.isEmpty()) {
             logService.writeLog(sessionUserId, "changePassword", "User", "-", "error:user_not_found");
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new HashMap<String, Object>() {{

@@ -2,6 +2,7 @@ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, Typography, Table, TableBody, TableRow, TableCell, Button, Box } from "@mui/material";
 import { formatDateTime } from "./dateUtil";
+import SessionExpiredMessage from "./SessionExpiredMessage";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -30,15 +31,25 @@ type Address = {
 
 
 const AddressInfo: React.FC = () => {
+		const [sessionExpired, setSessionExpired] = React.useState(false);
 	// 役割（mstrole）一覧を取得
 	const [mstroles, setMstroles] = React.useState<{ id: number; name: string; deletedAt?: string | null }[]>([]);
 	React.useEffect(() => {
 		fetch("http://localhost:8081/api/mstrole", {
 			credentials: "include"
 		})
-			.then(res => res.json())
+			.then(res => {
+				if (!res.ok) {
+					setSessionExpired(true);
+					return null;
+				}
+				return res.json();
+			})
 			.then(data => {
 				if (Array.isArray(data)) setMstroles(data);
+			})
+			.catch(() => {
+				setSessionExpired(true);
 			});
 	}, []);
 	// カテゴリ（mstcategory）一覧を取得
@@ -47,9 +58,18 @@ const AddressInfo: React.FC = () => {
 		fetch("http://localhost:8081/api/mstcategory", {
 			credentials: "include"
 		})
-			.then(res => res.json())
+			.then(res => {
+				if (!res.ok) {
+					setSessionExpired(true);
+					return null;
+				}
+				return res.json();
+			})
 			.then(data => {
 				if (Array.isArray(data)) setMstcategories(data);
+			})
+			.catch(() => {
+				setSessionExpired(true);
 			});
 	}, []);
 	const location = useLocation();
@@ -71,6 +91,10 @@ const AddressInfo: React.FC = () => {
 				const res = await fetch(
 					`https://nominatim.openstreetmap.org/search?format=json&q=${query}`
 				);
+				if (!res.ok) {
+					setSessionExpired(true);
+					return;
+				}
 				const data = await res.json();
 				if (data && data.length > 0) {
 					setLatLng({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
@@ -79,7 +103,7 @@ const AddressInfo: React.FC = () => {
 					setError('位置情報が見つかりませんでした');
 				}
 			} catch (e) {
-				setError('位置情報の取得に失敗しました');
+				setSessionExpired(true);
 			} finally {
 				setLoading(false);
 			}
@@ -97,103 +121,107 @@ const AddressInfo: React.FC = () => {
 	}
 
 	return (
-		<Box display="flex" justifyContent="center" mt={4}>
-			<Box
-				sx={{
-					display: 'flex',
-					flexDirection: { xs: 'column', md: 'row' },
-					gap: 4,
-					width: '100%',
-					maxWidth: 1100,
-					alignItems: 'stretch',
-				}}
-			>
-				<Card sx={{ flex: 1, minWidth: 300, maxWidth: 500, mb: { xs: 2, md: 0 } }}>
-					<CardContent>
-						<Typography variant="h5" gutterBottom>住所詳細</Typography>
-						<Table>
-							<TableBody>
-								<TableRow>
-									<TableCell>ID</TableCell>
-									<TableCell>{address.id}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>名前</TableCell>
-									<TableCell>{address.name}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>住所</TableCell>
-									<TableCell>{address.address}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>電話番号</TableCell>
-									<TableCell>{address.phoneNumber}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>年齢</TableCell>
-									<TableCell>{address.age}歳</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>性別</TableCell>
-									<TableCell>{
-							address.sex === "male" ? "男性" :
-							address.sex === "female" ? "女性" :
-							address.sex === "other" ? "その他" :
-							address.sex
-						}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>カテゴリ</TableCell>
-									<TableCell>{
-									  (() => {
-										const category = mstcategories.find(c => c.id === address.category);
-										return category ? category.name : address.category;
-									  })()
-									}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>役職</TableCell>
-									<TableCell>{
-									  (() => {
-										const role = mstroles.find(r => r.id === address.role);
-										return role ? role.name : address.role;
-									  })()
-									}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell>作成日時</TableCell>
-									<TableCell>{formatDateTime(address.createdAt)}</TableCell>
-								</TableRow>
-									<TableCell>更新日時</TableCell>
-									<TableCell>{formatDateTime(address.updatedAt)}</TableCell>
-							</TableBody>
-						</Table>
-						<Box display="flex" justifyContent="flex-end" mt={2}>
-							{/* <Button variant="contained" onClick={() => navigate(-1)}>戻る</Button> */}
-							<Button variant="contained" onClick={() => navigate('/address')}>戻る</Button>
-						</Box>
-					</CardContent>
-				</Card>
-				<Box flex={1} minWidth={300} maxWidth={600} minHeight={300}>
-					<Typography variant="h6" gutterBottom>地図</Typography>
-					{loading && <Typography>地図を読み込み中...</Typography>}
-					{error && <Typography color="error">{error}</Typography>}
-					{latLng && (
-						<MapContainer center={latLng} zoom={16} style={{ height: 300, width: '100%' }} scrollWheelZoom={false}>
-							<TileLayer
-								attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-								url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-							/>
-							<Marker position={latLng}>
-								<Popup>
-									{address.name}<br />{address.address}
-								</Popup>
-							</Marker>
-						</MapContainer>
-					)}
+		sessionExpired ? (
+			<SessionExpiredMessage onLogin={() => window.location.href = "/"} />
+		) : (
+			<Box display="flex" justifyContent="center" mt={4}>
+				<Box
+					sx={{
+						display: 'flex',
+						flexDirection: { xs: 'column', md: 'row' },
+						gap: 4,
+						width: '100%',
+						maxWidth: 1100,
+						alignItems: 'stretch',
+					}}
+				>
+					<Card sx={{ flex: 1, minWidth: 300, maxWidth: 500, mb: { xs: 2, md: 0 } }}>
+						<CardContent>
+							<Typography variant="h5" gutterBottom>住所詳細</Typography>
+							<Table>
+								<TableBody>
+									<TableRow>
+										<TableCell>ID</TableCell>
+										<TableCell>{address.id}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>名前</TableCell>
+										<TableCell>{address.name}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>住所</TableCell>
+										<TableCell>{address.address}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>電話番号</TableCell>
+										<TableCell>{address.phoneNumber}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>年齢</TableCell>
+										<TableCell>{address.age}歳</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>性別</TableCell>
+										<TableCell>{
+								address.sex === "male" ? "男性" :
+								address.sex === "female" ? "女性" :
+								address.sex === "other" ? "その他" :
+								address.sex
+							}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>カテゴリ</TableCell>
+										<TableCell>{
+										  (() => {
+											const category = mstcategories.find(c => c.id === address.category);
+											return category ? category.name : address.category;
+										  })()
+										}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>役職</TableCell>
+										<TableCell>{
+										  (() => {
+											const role = mstroles.find(r => r.id === address.role);
+											return role ? role.name : address.role;
+										  })()
+										}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>作成日時</TableCell>
+										<TableCell>{formatDateTime(address.createdAt)}</TableCell>
+									</TableRow>
+										<TableCell>更新日時</TableCell>
+										<TableCell>{formatDateTime(address.updatedAt)}</TableCell>
+								</TableBody>
+							</Table>
+							<Box display="flex" justifyContent="flex-end" mt={2}>
+								{/* <Button variant="contained" onClick={() => navigate(-1)}>戻る</Button> */}
+								<Button variant="contained" onClick={() => navigate('/address')}>戻る</Button>
+							</Box>
+						</CardContent>
+					</Card>
+					<Box flex={1} minWidth={300} maxWidth={600} minHeight={300}>
+						<Typography variant="h6" gutterBottom>地図</Typography>
+						{loading && <Typography>地図を読み込み中...</Typography>}
+						{error && <Typography color="error">{error}</Typography>}
+						{latLng && (
+							<MapContainer center={latLng} zoom={16} style={{ height: 300, width: '100%' }} scrollWheelZoom={false}>
+								<TileLayer
+									attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+									url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+								/>
+								<Marker position={latLng}>
+									<Popup>
+										{address.name}<br />{address.address}
+									</Popup>
+								</Marker>
+							</MapContainer>
+						)}
+					</Box>
 				</Box>
 			</Box>
-		</Box>
+		)
 	);
 };
 
