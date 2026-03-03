@@ -6,6 +6,7 @@ import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
 import HomeIcon from "@mui/icons-material/Home";
 import PaletteIcon from "@mui/icons-material/Palette";
+import AppsIcon from "@mui/icons-material/Apps";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
@@ -16,6 +17,7 @@ import Box from "@mui/material/Box";
 import AvatarMenu from './Avatar';
 import { Link } from 'react-router-dom';
 import { ThemeContext } from './ThemeContext';
+
 
 function isLightColor(hex: string) {
   try {
@@ -35,6 +37,7 @@ const getMenuItems = () => {
   const items = [
     { text: "住所一覧", path: "/address", icon: <HomeIcon /> },
     { text: "色変更", path: "/color", icon: <PaletteIcon /> },
+    { text: "外部アプリ", path: "/externalapps", icon: <AppsIcon /> }
   ];
   let role = '';
   try {

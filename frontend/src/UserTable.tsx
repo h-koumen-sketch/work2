@@ -20,6 +20,7 @@ import {
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, Refresh as RefreshIcon, Restore as RestoreIcon } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
+import SessionExpiredMessage from "./SessionExpiredMessage";
 
 type User = {
   id: number;
@@ -36,6 +37,7 @@ type UserFormData = Omit<User, "id" | "createdAt" | "updatedAt" | "deletedAt"> &
 };
 
 const UserTable: React.FC = () => {
+    const [sessionExpired, setSessionExpired] = useState(false);
   const [data, setData] = useState<User[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -56,10 +58,14 @@ const UserTable: React.FC = () => {
       const response = await fetch("http://localhost:8081/users", {
         credentials: "include"
       });
+      if (!response.ok) {
+        setSessionExpired(true);
+        return;
+      }
       const userData = await response.json();
       setData(userData);
     } catch (err) {
-      console.error("Failed to fetch users:", err);
+      setSessionExpired(true);
     }
   };
 
@@ -78,12 +84,12 @@ const UserTable: React.FC = () => {
         credentials: "include"
       });
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        setSessionExpired(true);
+        return;
       }
       await fetchUsers();
     } catch (err) {
-      console.error("Failed to restore user:", err);
-      alert("ユーザーの復活に失敗しました");
+      setSessionExpired(true);
     }
   };
 
@@ -167,14 +173,14 @@ const UserTable: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        setSessionExpired(true);
+        return;
       }
 
       await fetchUsers();
       handleCloseDialog();
     } catch (err) {
-      console.error("Failed to save user:", err);
-      alert("ユーザーの保存に失敗しました");
+      setSessionExpired(true);
     }
   };
 
@@ -196,13 +202,13 @@ const UserTable: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        setSessionExpired(true);
+        return;
       }
 
       await fetchUsers();
     } catch (err) {
-      console.error("Failed to delete user:", err);
-      alert("ユーザーの削除に失敗しました");
+      setSessionExpired(true);
     }
   };
 
@@ -251,100 +257,106 @@ const UserTable: React.FC = () => {
 
   return (
     <>
-      <Box sx={{ mb: 2, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleOpenCreateDialog}
-        >
-          新規ユーザー追加
-        </Button>
-        <Button
-          variant="outlined"
-          sx={{ ml: 2 }}
-          startIcon={<RefreshIcon />}
-          onClick={fetchUsers}
-        >
-          再読み込み
-        </Button>
-      </Box>
-
-      <MaterialReactTable columns={columns} data={data} />
-
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {isEditing ? "ユーザーを編集" : "新規ユーザーを追加"}
-        </DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <form
-            onKeyDown={e => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleSaveUser();
-              }
-            }}
-          >
-
-          <TextField
-            autoFocus
-            label="ユーザー名"
-            value={formData.name}
-            onChange={(e) => handleFormChange("name", e.target.value)}
-            fullWidth
-            margin="normal"
-            error={!!formErrors.name}
-            helperText={formErrors.name}
-          />
-          <TextField
-            label="メールアドレス"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleFormChange("email", e.target.value)}
-            fullWidth
-            margin="normal"
-            disabled={isEditing}
-            error={!!formErrors.email}
-            helperText={formErrors.email}
-          />
-          {!isEditing && (
-            <TextField
-              label="パスワード"
-              type="password"
-              value={formData.passwordHash || ""}
-              onChange={(e) => handleFormChange("passwordHash", e.target.value)}
-              fullWidth
-              margin="normal"
-              error={!!formErrors.passwordHash}
-              helperText={formErrors.passwordHash}
-            />
-          )}
-
-          </form>
-          <FormControl fullWidth margin="normal" error={!!formErrors.role}>
-            <InputLabel>権限</InputLabel>
-            <Select
-              value={formData.role}
-              label="権限"
-              onChange={(e) => handleFormChange("role", e.target.value)}
+      {sessionExpired ? (
+        <SessionExpiredMessage onLogin={() => window.location.href = "/"} />
+      ) : (
+        <>
+          <Box sx={{ mb: 2, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleOpenCreateDialog}
             >
-              <MenuItem value="user">一般ユーザー</MenuItem>
-              <MenuItem value="admin">管理者</MenuItem>
-              <MenuItem value="super_admin">スーパー管理者</MenuItem>
-            </Select>
-            {formErrors.role && <Typography color="error" variant="caption">{formErrors.role}</Typography>}
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>キャンセル</Button>
-          <Button onClick={handleSaveUser} variant="contained">
-            保存
-          </Button>
-        </DialogActions>
-      </Dialog>
+              新規ユーザー追加
+            </Button>
+            <Button
+              variant="outlined"
+              sx={{ ml: 2 }}
+              startIcon={<RefreshIcon />}
+              onClick={fetchUsers}
+            >
+              再読み込み
+            </Button>
+          </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, mt: 2, mr: 2 }}>
-        <Button variant="contained" onClick={() => navigate('/admin')}> 戻る </Button>
-      </Box>
+          <MaterialReactTable columns={columns} data={data} />
+
+          <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+            <DialogTitle>
+              {isEditing ? "ユーザーを編集" : "新規ユーザーを追加"}
+            </DialogTitle>
+            <DialogContent sx={{ pt: 2 }}>
+              <form
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSaveUser();
+                  }
+                }}
+              >
+
+              <TextField
+                autoFocus
+                label="ユーザー名"
+                value={formData.name}
+                onChange={(e) => handleFormChange("name", e.target.value)}
+                fullWidth
+                margin="normal"
+                error={!!formErrors.name}
+                helperText={formErrors.name}
+              />
+              <TextField
+                label="メールアドレス"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleFormChange("email", e.target.value)}
+                fullWidth
+                margin="normal"
+                disabled={isEditing}
+                error={!!formErrors.email}
+                helperText={formErrors.email}
+              />
+              {!isEditing && (
+                <TextField
+                  label="パスワード"
+                  type="password"
+                  value={formData.passwordHash || ""}
+                  onChange={(e) => handleFormChange("passwordHash", e.target.value)}
+                  fullWidth
+                  margin="normal"
+                  error={!!formErrors.passwordHash}
+                  helperText={formErrors.passwordHash}
+                />
+              )}
+
+              </form>
+              <FormControl fullWidth margin="normal" error={!!formErrors.role}>
+                <InputLabel>権限</InputLabel>
+                <Select
+                  value={formData.role}
+                  label="権限"
+                  onChange={(e) => handleFormChange("role", e.target.value)}
+                >
+                  <MenuItem value="user">一般ユーザー</MenuItem>
+                  <MenuItem value="admin">管理者</MenuItem>
+                  <MenuItem value="super_admin">スーパー管理者</MenuItem>
+                </Select>
+                {formErrors.role && <Typography color="error" variant="caption">{formErrors.role}</Typography>}
+              </FormControl>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDialog}>キャンセル</Button>
+              <Button onClick={handleSaveUser} variant="contained">
+                保存
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, mt: 2, mr: 2 }}>
+            <Button variant="contained" onClick={() => navigate('/admin')}> 戻る </Button>
+          </Box>
+        </>
+      )}
     </>
   );
 };

@@ -27,7 +27,10 @@ public class MstroleController {
      * @return ロールリスト
      */
     @GetMapping("")
-    public List<Mstrole> getAll() {
+    public Object getAll(jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         return repository.findAll();
     }
 
@@ -40,10 +43,11 @@ public class MstroleController {
      * @return ロール情報 or 404
      */
     @GetMapping("/{id}")
-    public Mstrole getById(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+    public Object getById(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         return repository.findById(id).map(mstrole -> mstrole).orElseGet(() -> {
             logService.writeLog(sessionUserId, "getById", "Mstrole", String.valueOf(id), "error:not_found");
             return null;
@@ -60,13 +64,14 @@ public class MstroleController {
      * @return 作成されたロール情報
      */
     @PostMapping("")
-    public Mstrole create(@RequestBody Mstrole mstrole, jakarta.servlet.http.HttpSession session) {
+    public Object create(@RequestBody Mstrole mstrole, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+        }
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         mstrole.setCreatedAt(now);
         mstrole.setUpdatedAt(now);
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         Mstrole saved = repository.save(mstrole);
         logService.writeLog(sessionUserId, "create", "Mstrole", String.valueOf(saved.getId()), "success");
         return saved;
@@ -83,10 +88,11 @@ public class MstroleController {
      * @return 更新されたロール情報 or 404
      */
     @PutMapping("/{id}")
-    public Mstrole update(@PathVariable Integer id, @RequestBody Mstrole mstrole, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+    public Object update(@PathVariable Integer id, @RequestBody Mstrole mstrole, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         if (!repository.existsById(id)) {
             logService.writeLog(sessionUserId, "update", "Mstrole", String.valueOf(id), "error:not_found");
             return null;
@@ -107,10 +113,11 @@ public class MstroleController {
      * @return 復活後のロール情報
      */
     @PutMapping("/restore/{id}")
-    public Mstrole restore(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+    public Object restore(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         return repository.findById(id).map(mstrole -> {
             mstrole.setDeletedAt(null);
             mstrole.setUpdatedAt(java.time.LocalDateTime.now());
@@ -133,10 +140,11 @@ public class MstroleController {
      * @return 論理削除されたロール情報 or 404
      */
     @PutMapping("/delete/{id}")
-    public Mstrole softDelete(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+    public Object softDelete(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         return repository.findById(id).map(mstrole -> {
             mstrole.setUpdatedAt(java.time.LocalDateTime.now());
             mstrole.setDeletedAt(java.time.LocalDateTime.now());

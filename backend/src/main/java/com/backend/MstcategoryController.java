@@ -27,7 +27,10 @@ public class MstcategoryController {
      * @return カテゴリリスト
      */
     @GetMapping("")
-    public List<Mstcategory> getAll() {
+    public Object getAll(jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
         return repository.findAll();
     }
 
@@ -41,10 +44,11 @@ public class MstcategoryController {
      * @return カテゴリ情報 or 404
      */
     @GetMapping("/{id}")
-    public Mstcategory getById(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+    public Object getById(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         return repository.findById(id).map(mstcategory -> mstcategory).orElseGet(() -> {
             logService.writeLog(sessionUserId, "getById", "Mstcategory", String.valueOf(id), "error:not_found");
             return null;
@@ -61,13 +65,14 @@ public class MstcategoryController {
      * @return 作成されたカテゴリ情報
      */
     @PostMapping("")
-    public Mstcategory create(@RequestBody Mstcategory mstcategory, jakarta.servlet.http.HttpSession session) {
+    public Object create(@RequestBody Mstcategory mstcategory, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+        }
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         mstcategory.setCreatedAt(now);
         mstcategory.setUpdatedAt(now);
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         Mstcategory saved = repository.save(mstcategory);
         logService.writeLog(sessionUserId, "create", "Mstcategory", String.valueOf(saved.getId()), "success");
         return saved;
@@ -84,10 +89,11 @@ public class MstcategoryController {
      * @return 更新されたカテゴリ情報 or 404
      */
     @PutMapping("/{id}")
-    public Mstcategory update(@PathVariable Integer id, @RequestBody Mstcategory mstcategory, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+    public Object update(@PathVariable Integer id, @RequestBody Mstcategory mstcategory, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         if (!repository.existsById(id)) {
             logService.writeLog(sessionUserId, "update", "Mstcategory", String.valueOf(id), "error:not_found");
             return null;
@@ -108,10 +114,11 @@ public class MstcategoryController {
      * @return 論理削除されたカテゴリ情報 or 404
      */
     @PutMapping("/restore/{id}")
-    public Mstcategory restore(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+    public Object restore(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         return repository.findById(id).map(mstcategory -> {
             mstcategory.setDeletedAt(null);
             mstcategory.setUpdatedAt(java.time.LocalDateTime.now());
@@ -125,10 +132,11 @@ public class MstcategoryController {
     }
 
     @PutMapping("/delete/{id}")
-    public Mstcategory softDelete(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
-        String sessionUserId = session != null && session.getAttribute("userId") != null
-            ? String.valueOf(session.getAttribute("userId"))
-            : "system";
+    public Object softDelete(@PathVariable Integer id, jakarta.servlet.http.HttpSession session) {
+        if (session == null || session.getAttribute("userId") == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+        }
+        String sessionUserId = String.valueOf(session.getAttribute("userId"));
         return repository.findById(id).map(mstcategory -> {
             mstcategory.setUpdatedAt(java.time.LocalDateTime.now());
             mstcategory.setDeletedAt(java.time.LocalDateTime.now());

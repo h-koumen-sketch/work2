@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, Refresh as RefreshIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import SessionExpiredMessage from "./SessionExpiredMessage";
 
 type MasterType = "mstrole" | "mstcategory";
 
@@ -142,6 +143,7 @@ const masterEditApi: Record<MasterType, { url: (id: number) => string; method: "
 };
 
 const Master: React.FC = () => {
+    const [sessionExpired, setSessionExpired] = useState(false);
   const [selectedMaster, setSelectedMaster] = useState<MasterType>("mstrole");
   const [data, setData] = useState<any[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -153,12 +155,18 @@ const Master: React.FC = () => {
     fetch(`http://localhost:8081${masterApi[selectedMaster]}`, {
       credentials: "include"
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          setSessionExpired(true);
+          return null;
+        }
+        return res.json();
+      })
       .then((data) => {
         setData(Array.isArray(data) ? data : []);
       })
       .catch(() => {
-        setData([]);
+        setSessionExpired(true);
       });
   }, [selectedMaster]);
 
@@ -178,17 +186,29 @@ const Master: React.FC = () => {
         method,
         credentials: "include",
       });
-      if (!res.ok) throw new Error("削除に失敗しました");
+      if (!res.ok) {
+        setSessionExpired(true);
+        return;
+      }
       // 削除後にテーブルを再取得して最新状態にする
       fetch(`http://localhost:8081${masterApi[selectedMaster]}`, {
         credentials: "include"
       })
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) {
+            setSessionExpired(true);
+            return null;
+          }
+          return res.json();
+        })
         .then((data) => {
           setData(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          setSessionExpired(true);
         });
     } catch (err) {
-      alert("削除に失敗しました");
+      setSessionExpired(true);
     }
   };
 
@@ -268,19 +288,31 @@ const masterCreateApi: Record<MasterType, { url: string; method: "POST" }> = {
         body: JSON.stringify(formData),
         credentials: "include"
       });
-      if (!res.ok) throw new Error('追加に失敗しました');
+      if (!res.ok) {
+        setSessionExpired(true);
+        return;
+      }
       // 成功時は再取得
       fetch(`http://localhost:8081${masterApi[selectedMaster]}`, {
         credentials: "include"
       })
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) {
+            setSessionExpired(true);
+            return null;
+          }
+          return res.json();
+        })
         .then((data) => {
           setData(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          setSessionExpired(true);
         });
       handleCloseDialog();
       setFormErrors({});
     } catch (err) {
-      alert('追加に失敗しました');
+      setSessionExpired(true);
     }
   };
 
@@ -312,19 +344,31 @@ const masterCreateApi: Record<MasterType, { url: string; method: "POST" }> = {
         body: JSON.stringify(formData),
         credentials: "include"
       });
-      if (!res.ok) throw new Error('更新に失敗しました');
+      if (!res.ok) {
+        setSessionExpired(true);
+        return;
+      }
       // 成功時は再取得
       fetch(`http://localhost:8081${masterApi[selectedMaster]}`, {
         credentials: "include"
       })
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) {
+            setSessionExpired(true);
+            return null;
+          }
+          return res.json();
+        })
         .then((data) => {
           setData(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          setSessionExpired(true);
         });
       handleCloseDialog();
       setFormErrors({});
     } catch (err) {
-      alert('更新に失敗しました');
+      setSessionExpired(true);
     }
   };
   
@@ -342,17 +386,29 @@ const masterRestoreApi: Record<MasterType, { url: (id: number) => string; method
         method,
         credentials: "include"
       });
-      if (!res.ok) throw new Error('復活に失敗しました');
+      if (!res.ok) {
+        setSessionExpired(true);
+        return;
+      }
       // 復活後は再取得
       fetch(`http://localhost:8081${masterApi[selectedMaster]}`, {
         credentials: "include"
       })
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) {
+            setSessionExpired(true);
+            return null;
+          }
+          return res.json();
+        })
         .then((data) => {
           setData(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          setSessionExpired(true);
         });
     } catch (err) {
-      alert('復活に失敗しました');
+      setSessionExpired(true);
     }
   };
 
@@ -377,62 +433,68 @@ const masterRestoreApi: Record<MasterType, { url: (id: number) => string; method
 
   return (
     <>
-      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center' }}>
-        <FormControl variant="outlined" size="small" style={{ minWidth: 200, background: '#fff', margin: '16px' }}>
-          <InputLabel id="master-select-label" shrink>マスタ選択</InputLabel>
-          <Select
-            labelId="master-select-label"
-            value={selectedMaster}
-            label="マスタ選択"
-            onChange={e => setSelectedMaster(e.target.value as MasterType)}
-          >
-            {masterOptions.map(opt => (
-              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        {AddButton}
-      </div>
-      <MaterialReactTable table={table} />
+      {sessionExpired ? (
+        <SessionExpiredMessage onLogin={() => window.location.href = "/"} />
+      ) : (
+        <>
+          <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center' }}>
+            <FormControl variant="outlined" size="small" style={{ minWidth: 200, background: '#fff', margin: '16px' }}>
+              <InputLabel id="master-select-label" shrink>マスタ選択</InputLabel>
+              <Select
+                labelId="master-select-label"
+                value={selectedMaster}
+                label="マスタ選択"
+                onChange={e => setSelectedMaster(e.target.value as MasterType)}
+              >
+                {masterOptions.map(opt => (
+                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {AddButton}
+          </div>
+          <MaterialReactTable table={table} />
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{isEditing ? "編集" : "新規追加"}</DialogTitle>
-        <DialogContent>
-          <form
-            onKeyDown={e => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                isEditing ? handleSave() : handleCreate();
-              }
-            }}
-          >
-          {masterFormFields[selectedMaster].map(field => (
-            <TextField
-              key={field.key}
-              label={field.label}
-              type={field.type || "text"}
-              value={formData[field.key] ?? ""}
-              onChange={e =>
-                setFormData((prev: any) => ({ ...prev, [field.key]: e.target.value }))
-              }
-              fullWidth
-              margin="normal"
-              required={field.required}
-              error={!!formErrors[field.key]}
-              helperText={formErrors[field.key]}
-            />
-          ))}
-          </form>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>キャンセル</Button>
-          {isEditing ? (
-            <Button variant="contained" onClick={handleSave}>保存</Button>
-          ) : (
-            <Button variant="contained" onClick={handleCreate}>追加</Button>
-          )}
-        </DialogActions>
-      </Dialog>
+          <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+            <DialogTitle>{isEditing ? "編集" : "新規追加"}</DialogTitle>
+            <DialogContent>
+              <form
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    isEditing ? handleSave() : handleCreate();
+                  }
+                }}
+              >
+              {masterFormFields[selectedMaster].map(field => (
+                <TextField
+                  key={field.key}
+                  label={field.label}
+                  type={field.type || "text"}
+                  value={formData[field.key] ?? ""}
+                  onChange={e =>
+                    setFormData((prev: any) => ({ ...prev, [field.key]: e.target.value }))
+                  }
+                  fullWidth
+                  margin="normal"
+                  required={field.required}
+                  error={!!formErrors[field.key]}
+                  helperText={formErrors[field.key]}
+                />
+              ))}
+              </form>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDialog}>キャンセル</Button>
+              {isEditing ? (
+                <Button variant="contained" onClick={handleSave}>保存</Button>
+              ) : (
+                <Button variant="contained" onClick={handleCreate}>追加</Button>
+              )}
+            </DialogActions>
+          </Dialog>
+        </>
+      )}
     </>
   );
 };

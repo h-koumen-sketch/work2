@@ -4,6 +4,7 @@ import { Box, Typography, IconButton, Button } from "@mui/material";
 import { MaterialReactTable, MRT_ColumnDef } from "material-react-table";
 import RestoreIcon from '@mui/icons-material/Restore';
 import { useNavigate } from "react-router-dom";
+import SessionExpiredMessage from "./SessionExpiredMessage";
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, Refresh as RefreshIcon } from "@mui/icons-material";
 
 
@@ -21,6 +22,7 @@ type Address = {
 };
 
 const AddressResurrection: React.FC = () => {
+        const [sessionExpired, setSessionExpired] = useState(false);
     const [data, setData] = useState<Address[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -32,10 +34,14 @@ const AddressResurrection: React.FC = () => {
             const resp = await fetch("http://localhost:8081/address/deleted", {
                 credentials: "include"
             });
+            if (!resp.ok) {
+                setSessionExpired(true);
+                return;
+            }
             const addresses = await resp.json();
             setData(addresses);
         } catch (e) {
-            setData([]);
+            setSessionExpired(true);
         } finally {
             setLoading(false);
         }
@@ -50,9 +56,18 @@ const AddressResurrection: React.FC = () => {
         fetch("http://localhost:8081/api/mstrole", {
             credentials: "include"
         })
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) {
+                    setSessionExpired(true);
+                    return null;
+                }
+                return res.json();
+            })
             .then(data => {
                 if (Array.isArray(data)) setMstroles(data);
+            })
+            .catch(() => {
+                setSessionExpired(true);
             });
     }, []);
     const handleRestore = async (id: number) => {
@@ -64,13 +79,13 @@ const AddressResurrection: React.FC = () => {
                 },
                 credentials: "include"
             });
-            if (resp.ok) {
-                await fetchDeletedAddresses();
-            } else {
-                alert("復活に失敗しました");
+            if (!resp.ok) {
+                setSessionExpired(true);
+                return;
             }
-        } catch {
-            alert("復活に失敗しました");
+            await fetchDeletedAddresses();
+        } catch (e) {
+            setSessionExpired(true);
         }
     };
 
@@ -106,23 +121,28 @@ const AddressResurrection: React.FC = () => {
 
     return (
         <>
-            <Box sx={{ p: 4 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h4" gutterBottom>
-                        住所復活画面
-                    </Typography>
-                    <Button variant="outlined" onClick={fetchDeletedAddresses} sx={{ ml: 2 }}
+            {sessionExpired ? (
+                <SessionExpiredMessage onLogin={() => window.location.href = "/"} />
+            ) : (
+                <>
+                    <Box sx={{ p: 4 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="h4" gutterBottom>
+                                住所復活画面
+                            </Typography>
+                            <Button variant="outlined" onClick={fetchDeletedAddresses} sx={{ ml: 2 }}
+                                startIcon={<RefreshIcon />}>
+                                再読み込み
+                            </Button>
+                        </Box>
+                        <MaterialReactTable columns={columns} data={data} state={{ isLoading: loading }} />
+                    </Box>
 
-                        startIcon={<RefreshIcon />}>
-                        再読み込み
-                    </Button>
-                </Box>
-                <MaterialReactTable columns={columns} data={data} state={{ isLoading: loading }} />
-            </Box>
-
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, mt: 2, mr: 2 }}>
-                <Button variant="contained" onClick={() => navigate('/admin')}> 戻る </Button>
-            </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, mt: 2, mr: 2 }}>
+                        <Button variant="contained" onClick={() => navigate('/admin')}> 戻る </Button>
+                    </Box>
+                </>
+            )}
         </>
     );
 };
